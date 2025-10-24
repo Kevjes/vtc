@@ -28,20 +28,25 @@ class AuthService {
         throw new Error(data.message || 'Erreur lors de la connexion')
       }
 
-      // Store token in localStorage and cookies
-      if (data.data) {
+      // Store token in localStorage and cookies (support string or object payload)
+      const tokenFromData = typeof data.data === 'string'
+        ? data.data
+        : (data.data?.token || data.data?.accessToken || data.data?.jwt || null)
+
+      if (tokenFromData) {
         console.log('✅ [AuthService] Token stocké dans localStorage et cookies')
-        localStorage.setItem('auth_token', data.data)
+        localStorage.setItem('auth_token', tokenFromData)
 
         // Also store in cookies for middleware access
-        document.cookie = `auth_token=${data.data}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`
+        document.cookie = `auth_token=${tokenFromData}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`
       } else {
-        console.log('❌ [AuthService] Pas de token dans la réponse')
+        console.log('❌ [AuthService] Pas de token exploitable dans la réponse')
+        throw new Error('Token manquant dans la réponse de login')
       }
 
       // Adapter la réponse au format attendu
       return {
-        token: data.data,
+        token: tokenFromData,
         user: null // Sera récupéré plus tard via l'API
       }
     } catch (error) {
@@ -103,8 +108,11 @@ class AuthService {
       }
 
       console.log('🔍 [AuthService] Décodage du JWT...')
-      // Decode JWT to get user ID
-      const payload = JSON.parse(atob(token.split('.')[1]))
+      // Decode JWT (base64url safe) to get user ID
+      const part = token.split('.')[1]
+      const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + (4 - (base64.length % 4 || 4)) % 4, '=');
+      const payload = JSON.parse(atob(padded))
       console.log('🔍 [AuthService] Payload JWT:', payload)
       console.log('🔍 [AuthService] Toutes les propriétés du payload:', Object.keys(payload))
 
@@ -246,8 +254,10 @@ class AuthService {
         return false
       }
 
-      // Real JWT validation
-      const payload = JSON.parse(atob(parts[1]))
+      // Real JWT validation (base64url safe)
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + (4 - (base64.length % 4 || 4)) % 4, '=');
+      const payload = JSON.parse(atob(padded))
 
       // Check if token has expiration and if it's still valid
       if (payload.exp && payload.exp * 1000 < Date.now()) {

@@ -1,5 +1,7 @@
 'use client'
 
+'use client'
+
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
 import { AuthState, AuthUser, LoginCredentials, UserType } from '@/types'
 import { authService } from '@/services/auth'

@@ -435,12 +435,61 @@ export interface ApiDocument {
 
 export interface ApiEvaluation {
   uuid: string
-  driverId: string
-  partnerId: string
-  overallRating: number
+  version: number
+  code: string
+  slug?: string | null
+  createdBy?: number
+  createdDate: string
+  lastModifiedBy?: number
+  lastModifiedDate: string
+  deleted?: boolean
+  isDeletable?: boolean
+  driver: ApiDriver
+  partner: ApiPartner
+  evaluator: AuthUser
+  template: ApiEvaluationTemplate
+  evaluationDate: string
+  comments?: string
+  periodStart: string
+  periodEnd: string
+  averageScore: number
+  status: 'PENDING' | 'COMPLETED' | 'VALIDATED' | 'REJECTED'
+  evaluationScores: ApiEvaluationScore[]
+}
+
+export interface ApiEvaluationScore {
+  uuid: string
+  version: number
+  code: string
+  slug?: string | null
+  createdBy?: number
+  createdDate: string
+  lastModifiedBy?: number
+  lastModifiedDate: string
+  deleted?: boolean
+  isDeletable?: boolean
+  evaluation: string
+  criteria: ApiEvaluationCriteria
+  value?: string | null
+  numericValue: number
   comment?: string
-  createdAt: string
-  criteria?: any
+}
+
+export interface ApiEvaluationCriteria {
+  uuid: string
+  version: number
+  code: string
+  slug?: string | null
+  createdBy?: number
+  createdDate: string
+  lastModifiedBy?: number
+  lastModifiedDate: string
+  deleted?: boolean
+  isDeletable?: boolean
+  name: string
+  description?: string
+  active: boolean
+  templateCriteriaList?: any[] | null
 }
 
 // Create/Update DTOs for Drivers
@@ -547,4 +596,96 @@ export interface UpdatePartnerRequest {
   phone?: string
   companyIdentifier?: string
   address?: string
+}
+
+// Create/Update DTOs for Evaluation Criteria
+export interface CreateEvaluationCriteriaRequest {
+  name: string
+  description?: string
+  active: boolean
+}
+
+export interface UpdateEvaluationCriteriaRequest {
+  name?: string
+  description?: string
+  active?: boolean
+}
+
+// API Evaluation Template types
+export interface ApiEvaluationTemplate {
+  uuid: string
+  version: number
+  code: string
+  slug?: string | null
+  createdBy?: number
+  createdDate: string
+  lastModifiedBy?: number
+  lastModifiedDate: string
+  deleted?: boolean
+  isDeletable?: boolean
+  name: string
+  description?: string
+  active: boolean
+  templateCriteriaList?: ApiTemplateCriteria[] | null
+}
+
+export interface CreateEvaluationTemplateRequest {
+  name: string
+  description?: string
+  active: boolean
+  evaluationCriteriaList?: Array<{ uuid: string }>
+}
+
+export interface UpdateEvaluationTemplateRequest {
+  name?: string
+  description?: string
+  active?: boolean
+  evaluationCriteriaList?: Array<{ uuid: string }>
+}
+
+// Template Criteria types for API response
+export interface ApiTemplateCriteria {
+  uuid: string
+  version?: number | null
+  code?: string | null
+  slug?: string | null
+  createdBy?: number | null
+  createdDate?: string | null
+  lastModifiedBy?: number | null
+  lastModifiedDate?: string | null
+  deleted: boolean
+  isDeletable: boolean
+  evaluationTemplate: string
+  evaluationCriteria: ApiEvaluationCriteria
+  orderIndex: number
+}
+
+// Template export/import types
+export interface TemplateExportData {
+  name: string
+  description?: string
+  active: boolean
+  evaluationCriteriaList: Array<{
+    uuid: string
+    name: string
+    description?: string
+    orderIndex: number
+  }>
+  exportedAt: string
+  exportedBy: string
+}
+
+// Bulk operations types
+export interface BulkTemplateOperation {
+  uuids: string[]
+  action: 'activate' | 'deactivate' | 'delete'
+}
+
+// Template statistics types
+export interface TemplateStats {
+  uuid: string
+  name: string
+  usageCount: number
+  lastUsed?: string
+  averageScore?: number
 }

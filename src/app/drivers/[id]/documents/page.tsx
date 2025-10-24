@@ -150,7 +150,7 @@ export default function DriverDocumentsPage() {
     }
 
     loadData()
-  }, [params.id])
+  }, [params?.id])
 
   const handleApproveDocument = async (documentId: string) => {
     try {

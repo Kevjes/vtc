@@ -52,8 +52,11 @@ const navigationItems: NavigationItem[] = [
     href: '/evaluations',
     icon: StarIcon,
     children: [
-      { title: 'Toutes les évaluations', href: '/evaluations', icon: StarIcon },
-      { title: 'Critères d\'évaluation', href: '/evaluations/criteria', icon: StarIcon },
+      { title: 'Liste des évaluations', href: '/evaluations', icon: StarIcon },
+      { title: 'Gestion des statuts', href: '/evaluations/status', icon: StarIcon },
+      { title: 'Statistiques', href: '/evaluations/stats', icon: StarIcon },
+      { title: 'Critères', href: '/evaluations/criteria', icon: StarIcon },
+      { title: 'Templates', href: '/evaluations/templates', icon: StarIcon },
     ]
   },
 
@@ -117,6 +120,21 @@ interface NavigationProps {
 export function Navigation({ collapsed = false }: NavigationProps) {
   const pathname = usePathname()
 
+  // Fonction pour déterminer si un élément est actif
+  const isItemActive = (item: NavigationItem) => {
+    // Si l'item a des enfants, il n'est actif que si on est exactement sur sa route
+    if (item.children && item.children.length > 0) {
+      return pathname === item.href
+    }
+    // Sinon, logique normale
+    return pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
+  }
+
+  // Fonction pour déterminer si un enfant est actif
+  const isChildActive = (child: NavigationItem, parent: NavigationItem) => {
+    return pathname === child.href || (child.href !== parent.href && pathname.startsWith(child.href + '/'))
+  }
+
   // Groupes d'éléments avec séparateurs
   const groups = [
     { items: navigationItems.slice(0, 4) }, // Navigation principale
@@ -134,7 +152,7 @@ export function Navigation({ collapsed = false }: NavigationProps) {
           )}
           {group.items.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            const isActive = isItemActive(item)
 
             return (
               <div key={item.href}>
@@ -159,6 +177,27 @@ export function Navigation({ collapsed = false }: NavigationProps) {
                     </>
                   )}
                 </Link>
+                {item.title === 'Évaluations' && !collapsed && item.children && (
+                  <div className="ml-8 mt-1 space-y-1">
+                    {item.children.map((child) => {
+                      const childActive = isChildActive(child, item)
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={cn(
+                            'flex items-center px-3 py-1 text-xs rounded-lg transition-colors',
+                            'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                            childActive && 'bg-primary-50 text-primary-700 border-r-2 border-primary-500 dark:bg-primary-900/50 dark:text-primary-300',
+                            !childActive && 'text-neutral-600 dark:text-neutral-400'
+                          )}
+                        >
+                          <span>{child.title}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}

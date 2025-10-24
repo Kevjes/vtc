@@ -2,366 +2,416 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { 
+import {
   ArrowLeftIcon,
-  UserIcon,
-  CalendarIcon,
-  StarIcon,
+  PencilIcon,
+  TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
-  PencilIcon
+  ClockIcon,
+  ExclamationTriangleIcon,
+  StarIcon,
+  CalendarIcon,
+  UserIcon,
+  BuildingOfficeIcon
 } from '@heroicons/react/24/outline'
-import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid'
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import { DashboardLayout } from '@/components/layout'
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  Button, 
-  Badge, 
-  Avatar 
-} from '@/components/ui'
-
-interface EvaluationDetail {
-  id: string
-  driverName: string
-  partnerName: string
-  overallRating: number
-  criteria: {
-    punctuality: number
-    courtesy: number
-    vehicleCleanliness: number
-    routeRespect: boolean
-    communication: number
-    attendance: number
-  }
-  comment?: string
-  date: string
-  status: 'completed' | 'pending'
-  evaluatedBy: string
-  evaluationDate: string
-  period: string
-}
-
-// Mock data - à remplacer par un appel API
-const mockEvaluation: EvaluationDetail = {
-  id: '1',
-  driverName: 'Moussa Traoré',
-  partnerName: 'VTC Plus',
-  overallRating: 4.8,
-  criteria: {
-    punctuality: 5,
-    courtesy: 5,
-    vehicleCleanliness: 4,
-    routeRespect: true,
-    communication: 5,
-    attendance: 5
-  },
-  comment: 'Excellent chauffeur, très professionnel et ponctuel. Il maintient toujours son véhicule propre et communique bien avec les passagers. Attitude exemplaire et respect des consignes.',
-  date: '2024-09-07',
-  status: 'completed',
-  evaluatedBy: 'Mamadou Diarra',
-  evaluationDate: '2024-09-07',
-  period: 'Septembre 2024'
-}
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Avatar, Select } from '@/components/ui'
+import { evaluationsService, ApiEvaluation } from '@/services/evaluations'
+import '@/styles/templates.css'
 
 const getRatingStars = (rating: number) => {
-  return Array.from({ length: 5 }, (_, i) => (
-    <StarSolidIcon
+  return Array.from({ length: 10 }, (_, i) => (
+    <StarIconSolid
       key={i}
-      className={`h-5 w-5 ${
-        i < Math.floor(rating) ? 'text-yellow-500' : 'text-neutral-300 dark:text-neutral-600'
-      }`}
+      className={`h-4 w-4 ${i < Math.floor(rating) ? 'text-yellow-500' : 'text-neutral-300 dark:text-neutral-600'
+        }`}
     />
   ))
 }
 
-const getStatusBadge = (status: EvaluationDetail['status']) => {
+const getStatusBadge = (status: ApiEvaluation['status']) => {
   switch (status) {
-    case 'completed':
-      return <Badge variant="success" size="md">Terminée</Badge>
-    case 'pending':
-      return <Badge variant="warning" size="md">En attente</Badge>
+    case 'COMPLETED':
+      return <Badge variant="success" size="sm">Terminée</Badge>
+    case 'PENDING':
+      return <Badge variant="warning" size="sm">En attente</Badge>
+    case 'VALIDATED':
+      return <Badge variant="success" size="sm">Validée</Badge>
+    case 'REJECTED':
+      return <Badge variant="danger" size="sm">Rejetée</Badge>
+    default:
+      return <Badge variant="default" size="sm">{status}</Badge>
   }
 }
 
-const getCriteriaIcon = (value: number | boolean) => {
-  if (typeof value === 'boolean') {
-    return value ? (
-      <CheckCircleIcon className="h-5 w-5 text-green-500" />
-    ) : (
-      <XCircleIcon className="h-5 w-5 text-red-500" />
-    )
+const getStatusIcon = (status: ApiEvaluation['status']) => {
+  switch (status) {
+    case 'COMPLETED':
+      return <CheckCircleIcon className="h-6 w-6 text-green-500" />
+    case 'PENDING':
+      return <ClockIcon className="h-6 w-6 text-yellow-500" />
+    case 'VALIDATED':
+      return <CheckCircleIcon className="h-6 w-6 text-blue-500" />
+    case 'REJECTED':
+      return <ExclamationTriangleIcon className="h-6 w-6 text-red-500" />
+    default:
+      return <ClockIcon className="h-6 w-6 text-neutral-500" />
   }
-  
-  return (
-    <div className="flex items-center space-x-1">
-      <StarSolidIcon className="h-4 w-4 text-yellow-500" />
-      <span className="font-medium">{value}/5</span>
-    </div>
-  )
 }
 
 export default function EvaluationDetailPage() {
   const router = useRouter()
   const params = useParams()
-  const [evaluation, setEvaluation] = useState<EvaluationDetail | null>(null)
+  const evaluationId = params?.id as string
+
+  // États pour les données
+  const [evaluation, setEvaluation] = useState<ApiEvaluation | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+
+  // Charger l'évaluation
+  const loadEvaluation = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await evaluationsService.getEvaluation(evaluationId)
+      setEvaluation(data)
+    } catch (err) {
+      console.error('Erreur lors du chargement de l\'évaluation:', err)
+      setError(err instanceof Error ? err.message : 'Erreur inconnue')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const loadEvaluation = async () => {
-      setIsLoading(true)
+    if (evaluationId) {
+      loadEvaluation()
+    }
+  }, [evaluationId])
+
+  const handleStatusChange = async (newStatus: ApiEvaluation['status']) => {
+    if (!evaluation) return
+
+    setIsUpdatingStatus(true)
+    try {
+      const updatedEvaluation = await evaluationsService.updateEvaluationStatus(evaluation.uuid, newStatus)
+      setEvaluation(updatedEvaluation)
+    } catch (err) {
+      console.error('Erreur lors de la mise à jour du statut:', err)
+      setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour du statut')
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!evaluation) return
+
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette évaluation ?')) {
       try {
-        // Simulation d'appel API
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        setEvaluation(mockEvaluation)
-      } catch (error) {
-        console.error('Erreur lors du chargement de l\'évaluation:', error)
-      } finally {
-        setIsLoading(false)
+        await evaluationsService.deleteEvaluation(evaluation.uuid)
+        router.push('/evaluations')
+      } catch (err) {
+        console.error('Erreur lors de la suppression:', err)
+        setError(err instanceof Error ? err.message : 'Erreur lors de la suppression')
       }
     }
-
-    loadEvaluation()
-  }, [params.id])
+  }
 
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
-            <p className="mt-2 text-neutral-600 dark:text-neutral-400">Chargement...</p>
+        <div className="text-center py-12">
+          <div className="text-neutral-600 dark:text-neutral-400">Chargement de l'évaluation...</div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error || !evaluation) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => router.back()}>
+              <ArrowLeftIcon className="h-4 w-4 mr-2" />
+              Retour
+            </Button>
+          </div>
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-red-600 dark:text-red-400">
+              {error || 'Évaluation non trouvée'}
+            </p>
           </div>
         </div>
       </DashboardLayout>
     )
   }
 
-  if (!evaluation) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-neutral-600 dark:text-neutral-400">Évaluation non trouvée</p>
-            <Button 
-              onClick={() => router.push('/evaluations')} 
-              className="mt-4"
-            >
-              Retour aux évaluations
-            </Button>
-          </div>
-        </div>
-      </DashboardLayout>
-    )
-  }
+  const overallScore = (evaluation as any).averageScore || 0
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => router.back()}
-            >
-              <ArrowLeftIcon className="h-5 w-5" />
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="sm" onClick={() => router.back()}>
+              <ArrowLeftIcon className="h-4 w-4 mr-1" />
+              Retour
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                Évaluation de {evaluation.driverName}
+              <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">
+                Évaluation de {evaluation.driver.user.firstname} {evaluation.driver.user.lastname}
               </h1>
-              <p className="text-neutral-600 dark:text-neutral-400 mt-2">
-                {evaluation.period} • Évaluée par {evaluation.partnerName}
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Évaluée le {new Date(evaluation.evaluationDate).toLocaleDateString('fr-FR')}
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            {evaluation.status === 'pending' && (
-              <Button 
+          <div className="flex items-center space-x-2">
+            {evaluation.status === 'PENDING' && (
+              <Button
                 variant="outline"
-                onClick={() => router.push(`/evaluations/${params.id}/edit`)}
+                size="sm"
+                onClick={() => router.push(`/evaluations/${evaluation.uuid}/edit`)}
               >
-                <PencilIcon className="h-4 w-4 mr-2" />
+                <PencilIcon className="h-4 w-4 mr-1" />
                 Modifier
               </Button>
             )}
-            {getStatusBadge(evaluation.status)}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDelete}
+              disabled={evaluation.status === 'VALIDATED'}
+            >
+              <TrashIcon className="h-4 w-4 mr-1" />
+              Supprimer
+            </Button>
           </div>
         </div>
 
-        {/* Note globale */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <div className="flex items-center justify-center space-x-2 mb-2">
-                {getRatingStars(evaluation.overallRating)}
+        {/* Status and Score Overview */}
+        <div className="grid gap-3 md:grid-cols-3">
+          <Card>
+            <CardContent className="p-3">
+              <div className="flex items-center space-x-2">
+                {getStatusIcon(evaluation.status)}
+                <div>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400">Statut</p>
+                  {getStatusBadge(evaluation.status)}
+                </div>
               </div>
-              <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
-                {evaluation.overallRating.toFixed(1)}/5
-              </p>
-              <p className="text-neutral-600 dark:text-neutral-400">
-                Note globale
-              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
+                  <StarIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400">Note globale</p>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                      {overallScore.toFixed(1)}/10
+                    </span>
+                    <div className="flex">
+                      {getRatingStars(overallScore)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                  <CalendarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400">Période évaluée</p>
+                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    {new Date(evaluation.periodStart).toLocaleDateString('fr-FR')} - {new Date(evaluation.periodEnd).toLocaleDateString('fr-FR')}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Evaluation Details */}
+        <div className="grid gap-3 md:grid-cols-2">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Détails de l'évaluation</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="text-neutral-600 dark:text-neutral-400">Chauffeur: </span>
+                  <span className="font-medium">{evaluation.driver.user.firstname} {evaluation.driver.user.lastname}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-600 dark:text-neutral-400">Partenaire: </span>
+                  <span className="font-medium">{evaluation.partner.name}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-600 dark:text-neutral-400">Évaluateur: </span>
+                  <span className="font-medium">{evaluation.evaluator.firstname} {evaluation.evaluator.lastname}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-600 dark:text-neutral-400">Template: </span>
+                  <span className="font-medium">{evaluation.template.name}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Status Management */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Gestion du statut</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <Select
+                    value={evaluation.status}
+                    onChange={(e) => handleStatusChange(e.target.value as ApiEvaluation['status'])}
+                    disabled={isUpdatingStatus || evaluation.status === 'VALIDATED'}
+                    options={[
+                      { value: 'PENDING', label: 'En attente' },
+                      { value: 'COMPLETED', label: 'Terminée' },
+                      { value: 'VALIDATED', label: 'Validée' },
+                      { value: 'REJECTED', label: 'Rejetée' },
+                    ]}
+                    className="w-40"
+                  />
+                  {isUpdatingStatus && (
+                    <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                      Mise à jour...
+                    </div>
+                  )}
+                </div>
+
+                {/* Status workflow info */}
+                <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-3">
+                  <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-2 text-sm">
+                    Workflow des statuts
+                  </h4>
+                  <div className="flex items-center space-x-2 text-xs text-neutral-600 dark:text-neutral-400">
+                    <Badge variant="warning" size="sm">En attente</Badge>
+                    <span>→</span>
+                    <Badge variant="success" size="sm">Terminée</Badge>
+                    <span>→</span>
+                    <Badge variant="success" size="sm">Validée</Badge>
+                    <span className="text-xs">ou</span>
+                    <Badge variant="danger" size="sm">Rejetée</Badge>
+                  </div>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+                    Une fois validée, l'évaluation ne peut plus être modifiée.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Scores Detail */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Détail des scores</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              {(evaluation as any).evaluationScores && (evaluation as any).evaluationScores.map((score: any) => (
+                <div key={score.uuid} className="border border-neutral-200 dark:border-neutral-800 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
+                      {score.criteria.name}
+                    </h4>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex">
+                        {getRatingStars(score.numericValue)}
+                      </div>
+                      <span className="font-bold text-neutral-900 dark:text-neutral-100">
+                        {score.numericValue}/10
+                      </span>
+                    </div>
+                  </div>
+                  {score.criteria.description && (
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-2">
+                      {score.criteria.description}
+                    </p>
+                  )}
+                  {score.comment && (
+                    <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-2">
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 italic">
+                        "{score.comment}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Informations générales */}
+        {/* Comments */}
+        {evaluation.comments && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <UserIcon className="h-5 w-5 mr-2" />
-                Informations générales
-              </CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Commentaires généraux</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Avatar 
-                  fallback={evaluation.driverName.split(' ').map(n => n[0]).join('')}
-                  size="lg"
-                />
-                <div>
-                  <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">
-                    {evaluation.driverName}
-                  </h3>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                    Chauffeur VTC
-                  </p>
-                </div>
-              </div>
-              
-              <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                <div className="flex justify-between">
-                  <span className="text-neutral-600 dark:text-neutral-400">Partenaire</span>
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    {evaluation.partnerName}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600 dark:text-neutral-400">Évalué par</span>
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    {evaluation.evaluatedBy}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600 dark:text-neutral-400">Date d'évaluation</span>
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    {new Date(evaluation.evaluationDate).toLocaleDateString('fr-FR')}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600 dark:text-neutral-400">Période</span>
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    {evaluation.period}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Détail des critères */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <StarIcon className="h-5 w-5 mr-2" />
-                Détail des critères
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Ponctualité
-                  </span>
-                  {getCriteriaIcon(evaluation.criteria.punctuality)}
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Courtoisie
-                  </span>
-                  {getCriteriaIcon(evaluation.criteria.courtesy)}
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Propreté du véhicule
-                  </span>
-                  {getCriteriaIcon(evaluation.criteria.vehicleCleanliness)}
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Respect de l'itinéraire
-                  </span>
-                  {getCriteriaIcon(evaluation.criteria.routeRespect)}
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Communication
-                  </span>
-                  {getCriteriaIcon(evaluation.criteria.communication)}
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Assiduité
-                  </span>
-                  {getCriteriaIcon(evaluation.criteria.attendance)}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Commentaires */}
-        {evaluation.comment && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Commentaires et observations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="p-4 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-                <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                  {evaluation.comment}
+            <CardContent className="pt-0">
+              <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-3">
+                <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                  {evaluation.comments}
                 </p>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-6">
-          <Button
-            variant="outline"
-            onClick={() => router.push('/evaluations')}
-          >
-            Retour à la liste
-          </Button>
-          
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="outline"
-              onClick={() => window.print()}
-            >
-              Imprimer
-            </Button>
-            {evaluation.status === 'pending' && (
-              <Button
-                onClick={() => router.push(`/evaluations/${params.id}/edit`)}
-              >
-                <PencilIcon className="h-4 w-4 mr-2" />
-                Modifier l'évaluation
-              </Button>
-            )}
-          </div>
-        </div>
+        {/* Metadata */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Informations techniques</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div>
+                <p className="text-neutral-600 dark:text-neutral-400">Code</p>
+                <p className="font-medium text-neutral-900 dark:text-neutral-100">{evaluation.code}</p>
+              </div>
+              <div>
+                <p className="text-neutral-600 dark:text-neutral-400">Version</p>
+                <p className="font-medium text-neutral-900 dark:text-neutral-100">{evaluation.version}</p>
+              </div>
+              <div>
+                <p className="text-neutral-600 dark:text-neutral-400">Créée le</p>
+                <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                  {new Date(evaluation.createdDate).toLocaleDateString('fr-FR')}
+                </p>
+              </div>
+              <div>
+                <p className="text-neutral-600 dark:text-neutral-400">Modifiée le</p>
+                <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                  {new Date(evaluation.lastModifiedDate).toLocaleDateString('fr-FR')}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   )
