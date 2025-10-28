@@ -6,8 +6,8 @@ import {
   ChartBarIcon,
   CalendarIcon,
   UserIcon,
-  TrendingUpIcon,
-  TrendingDownIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
   ArrowPathIcon,
   FunnelIcon
 } from '@heroicons/react/24/outline'
@@ -342,7 +342,7 @@ export default function EvaluationStatsPage() {
                       </p>
                     </div>
                     <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                      <TrendingUpIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
+                      <ArrowTrendingUpIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
                     </div>
                   </div>
                 </CardContent>

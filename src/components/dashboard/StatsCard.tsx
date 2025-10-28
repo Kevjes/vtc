@@ -1,7 +1,7 @@
 import React from 'react'
 import { Card, CardContent } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { TrendingUpIcon, TrendingDownIcon } from '@heroicons/react/24/outline'
+import { ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline'
 
 interface StatsCardProps {
   title: string
@@ -93,9 +93,9 @@ export function StatsCard({
                     )}
                   >
                     {change.type === 'increase' ? (
-                      <TrendingUpIcon className="h-3 w-3" />
+                      <ArrowTrendingUpIcon className="h-3 w-3" />
                     ) : (
-                      <TrendingDownIcon className="h-3 w-3" />
+                      <ArrowTrendingDownIcon className="h-3 w-3" />
                     )}
                     <span>
                       {change.type === 'increase' ? '+' : '-'}{Math.abs(change.value)}%
