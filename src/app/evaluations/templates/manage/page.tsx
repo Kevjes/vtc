@@ -422,7 +422,7 @@ export default function ManageEvaluationTemplatesPage() {
             <Button variant="outline" onClick={() => setTemplateToDelete(null)} disabled={isDeleting}>
               Annuler
             </Button>
-            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+            <Button variant="danger" onClick={confirmDelete} disabled={isDeleting}>
               {isDeleting ? 'Suppression...' : 'Supprimer'}
             </Button>
           </div>

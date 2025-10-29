@@ -233,7 +233,7 @@ export default function EditEvaluationTemplatePage() {
 
               <div className="flex items-center space-x-3">
                 <Switch
-                  checked={formData.active}
+                  checked={!!formData.active}
                   onChange={(checked) => handleInputChange('active', checked)}
                 />
                 <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">

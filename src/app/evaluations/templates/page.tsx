@@ -165,7 +165,7 @@ export default function EvaluationTemplatesPage() {
           <p className="text-sm text-neutral-600 dark:text-neutral-400">Cette action est irréversible.</p>
           <div className="flex justify-end space-x-3">
             <Button variant="outline" onClick={() => setTemplateToDelete(null)} disabled={isDeleting}>Annuler</Button>
-            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+            <Button variant="danger" onClick={confirmDelete} disabled={isDeleting}>
               {isDeleting ? 'Suppression...' : 'Supprimer'}
             </Button>
           </div>

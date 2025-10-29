@@ -377,7 +377,6 @@ export default function NewEvaluationPage() {
                     value: driver.uuid,
                     label: `${driver.user.firstname} ${driver.user.lastname} (${driver.user.email})`
                   }))}
-                  placeholder="Sélectionner un chauffeur"
                 />
               </div>
               
@@ -392,7 +391,6 @@ export default function NewEvaluationPage() {
                     value: partner.uuid,
                     label: partner.name
                   }))}
-                  placeholder="Sélectionner un partenaire"
                 />
               </div>
             </div>
@@ -408,7 +406,6 @@ export default function NewEvaluationPage() {
                   value: template.uuid,
                   label: `${template.name} ${template.description ? `- ${template.description}` : ''}`
                 }))}
-                placeholder="Sélectionner un template"
               />
               {selectedTemplate && (
                 <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">

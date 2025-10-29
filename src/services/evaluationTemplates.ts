@@ -136,6 +136,97 @@ class EvaluationTemplatesService {
       throw new Error('Erreur de connexion au serveur')
     }
   }
+
+  // Ajout des méthodes manquantes utilisées par la page de gestion
+  async duplicateTemplate(uuid: string, newName?: string): Promise<ApiEvaluationTemplate> {
+    try {
+      console.log('🔍 [EvaluationTemplatesService] Duplication template...', uuid, newName)
+      const response = await authService.authenticatedFetch(`${this.baseURL}/evaluation-templates/${uuid}/duplicate`, {
+        method: 'POST',
+        body: JSON.stringify(newName ? { name: newName } : {})
+      })
+      const data: ApiResponse<ApiEvaluationTemplate> = await response.json()
+      console.log('🔍 [EvaluationTemplatesService] Réponse API duplicate template:', data)
+      if (!data.valid || data.status !== 200) {
+        console.log('❌ [EvaluationTemplatesService] Erreur API duplicate template:', data.message)
+        throw new Error(data.message || 'Erreur lors de la duplication du template')
+      }
+      console.log('✅ [EvaluationTemplatesService] Template dupliqué:', data.data)
+      return data.data
+    } catch (error) {
+      console.error('❌ [EvaluationTemplatesService] Erreur duplicateTemplate:', error)
+      if (error instanceof Error) throw error
+      throw new Error('Erreur de connexion au serveur')
+    }
+  }
+
+  async bulkUpdateStatus(uuids: string[], active: boolean): Promise<void> {
+    try {
+      console.log('🔍 [EvaluationTemplatesService] Mise à jour en masse du statut...', { uuidsCount: uuids.length, active })
+      const response = await authService.authenticatedFetch(`${this.baseURL}/evaluation-templates/bulk-update-status`, {
+        method: 'PUT',
+        body: JSON.stringify({ uuids, active })
+      })
+      const data: ApiResponse<void> = await response.json()
+      console.log('🔍 [EvaluationTemplatesService] Réponse API bulk update status:', data)
+      if (!data.valid || data.status !== 200) {
+        console.log('❌ [EvaluationTemplatesService] Erreur API bulk update status:', data.message)
+        throw new Error(data.message || 'Erreur lors de la mise à jour en masse du statut')
+      }
+      console.log('✅ [EvaluationTemplatesService] Statut mis à jour en masse')
+    } catch (error) {
+      console.error('❌ [EvaluationTemplatesService] Erreur bulkUpdateStatus:', error)
+      if (error instanceof Error) throw error
+      throw new Error('Erreur de connexion au serveur')
+    }
+  }
+
+  async exportTemplate(uuid: string): Promise<Blob> {
+    try {
+      console.log('🔍 [EvaluationTemplatesService] Export du template...', uuid)
+      const response = await authService.authenticatedFetch(`${this.baseURL}/evaluation-templates/${uuid}/export`, { method: 'GET' })
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      const blob = await response.blob()
+      console.log('✅ [EvaluationTemplatesService] Template exporté (blob)')
+      return blob
+    } catch (error) {
+      console.error('❌ [EvaluationTemplatesService] Erreur exportTemplate:', error)
+      if (error instanceof Error) throw error
+      throw new Error('Erreur de connexion au serveur')
+    }
+  }
+
+  async importTemplate(file: File): Promise<void> {
+    try {
+      console.log('🔍 [EvaluationTemplatesService] Import du template (fichier)...', file?.name)
+      const formData = new FormData()
+      formData.append('file', file)
+
+      // Utiliser fetch direct pour éviter le Content-Type JSON imposé
+      const token = authService.getToken()
+      const response = await fetch(`${this.baseURL}/evaluation-templates/import`, {
+        method: 'POST',
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: formData
+      })
+
+      const data: ApiResponse<void> = await response.json()
+      console.log('🔍 [EvaluationTemplatesService] Réponse API import template:', data)
+      if (!data.valid || data.status !== 200) {
+        console.log('❌ [EvaluationTemplatesService] Erreur API import template:', data.message)
+        throw new Error(data.message || 'Erreur lors de l\'import du template')
+      }
+      console.log('✅ [EvaluationTemplatesService] Template importé')
+    } catch (error) {
+      console.error('❌ [EvaluationTemplatesService] Erreur importTemplate:', error)
+      if (error instanceof Error) throw error
+      throw new Error('Erreur de connexion au serveur')
+    }
+  }
 }
 
 export const evaluationTemplatesService = new EvaluationTemplatesService()

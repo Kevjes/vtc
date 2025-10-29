@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Button } from '@/components/ui';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui';
 // removed: import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Edit, Trash2, Calendar, User, Code, FileText } from 'lucide-react';
 import { evaluationCriteriaService } from '@/services/evaluationCriteria';
@@ -106,7 +106,7 @@ export default function EvaluationCriteriaDetailPage() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Badge variant={criterion.active ? 'default' : 'secondary'}>
+            <Badge variant={criterion.active ? 'success' : 'danger'}>
               {criterion.active ? 'Actif' : 'Inactif'}
             </Badge>
             <Button onClick={handleEdit} size="sm">
@@ -166,7 +166,7 @@ export default function EvaluationCriteriaDetailPage() {
               <div>
                 <label className="text-sm font-medium text-gray-500">Créé le</label>
                 <p className="text-base">
-                  {format(new Date(criterion.createdDate), 'PPP à p', { locale: fr })}
+                  {format(new Date(criterion.createdDate), 'PPP à p')}
                 </p>
               </div>
               <div>
@@ -176,7 +176,7 @@ export default function EvaluationCriteriaDetailPage() {
               <div>
                 <label className="text-sm font-medium text-gray-500">Modifié le</label>
                 <p className="text-base">
-                  {format(new Date(criterion.lastModifiedDate), 'PPP à p', { locale: fr })}
+                  {format(new Date(criterion.lastModifiedDate), 'PPP à p')}
                 </p>
               </div>
               <div>

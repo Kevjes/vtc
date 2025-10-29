@@ -33,9 +33,9 @@ const getStatusBadge = (status: ApiEvaluation['status']) => {
     case 'VALIDATED':
       return <Badge variant="success" size="sm">Validée</Badge>
     case 'REJECTED':
-      return <Badge variant="destructive" size="sm">Rejetée</Badge>
+      return <Badge variant="danger" size="sm">Rejetée</Badge>
     default:
-      return <Badge variant="secondary" size="sm">{status}</Badge>
+      return <Badge variant="default" size="sm">{status}</Badge>
   }
 }
 
@@ -370,7 +370,7 @@ export default function EvaluationStatusPage() {
                   <div className="flex items-center space-x-2">
                     <Select
                       value={bulkAction}
-                      onChange={(e) => setBulkAction(e.target.value)}
+                      onChange={(e) => setBulkAction(e.target.value as ApiEvaluation['status'] | '')}
                       options={[
                         { value: '', label: 'Changer le statut...' },
                         { value: 'PENDING', label: 'En attente' },

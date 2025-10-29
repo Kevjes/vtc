@@ -48,9 +48,9 @@ const getStatusBadge = (status: ApiEvaluation['status']) => {
     case 'VALIDATED':
       return <Badge variant="success" size="sm">Validée</Badge>
     case 'REJECTED':
-      return <Badge variant="destructive" size="sm">Rejetée</Badge>
+      return <Badge variant="danger" size="sm">Rejetée</Badge>
     default:
-      return <Badge variant="secondary" size="sm">{status}</Badge>
+      return <Badge variant="default" size="sm">{status}</Badge>
   }
 }
 

@@ -131,12 +131,11 @@ export default function CreateEvaluationCriteriaPage() {
                   <div className="flex items-center space-x-2">
                     <Switch
                       checked={formData.active}
-                      onCheckedChange={handleSwitchChange}
-                      id="active"
+                      onChange={handleSwitchChange}
                     />
-                    <label htmlFor="active" className="text-sm">
+                    <span className="text-sm">
                       {formData.active ? 'Actif' : 'Inactif'}
-                    </label>
+                    </span>
                   </div>
                 </div>
               </div>
