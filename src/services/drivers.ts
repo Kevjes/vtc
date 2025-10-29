@@ -6,8 +6,9 @@ import {
   UpdateDriverRequest
 } from '@/types'
 import { authService } from './auth'
+import { usersService } from './users'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
 
 class DriversService {
   private baseURL = API_BASE_URL
@@ -135,7 +136,22 @@ class DriversService {
         body: JSON.stringify(driverData)
       })
 
-      const data: ApiResponse<ApiDriver> = await response.json()
+      // Parse safely to handle empty/204 responses
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      const text = await response.text()
+      if (!text || text.trim().length === 0 || response.status === 204) {
+        console.warn('⚠️ [DriversService] Réponse vide pour updateDriver, récupération du chauffeur…')
+        return await this.getDriver(uuid)
+      }
+      let data: ApiResponse<ApiDriver>
+      try {
+        data = JSON.parse(text)
+      } catch (parseError) {
+        console.error('Erreur parsing JSON:', text)
+        throw new Error('Réponse serveur invalide (JSON malformé)')
+      }
       console.log('🔍 [DriversService] Réponse API update driver:', data)
 
       if (!data.valid || data.status !== 200) {
@@ -162,7 +178,22 @@ class DriversService {
         method: 'DELETE'
       })
 
-      const data: ApiResponse<void> = await response.json()
+      // Parse safely to handle empty/204 responses
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      const text = await response.text()
+      if (!text || text.trim().length === 0 || response.status === 204) {
+        console.log('✅ [DriversService] Chauffeur supprimé (réponse vide/204)')
+        return
+      }
+      let data: ApiResponse<void>
+      try {
+        data = JSON.parse(text)
+      } catch (parseError) {
+        console.error('Erreur parsing JSON:', text)
+        throw new Error('Réponse serveur invalide (JSON malformé)')
+      }
       console.log('🔍 [DriversService] Réponse API delete driver:', data)
 
       if (!data.valid || data.status !== 200) {
@@ -277,25 +308,21 @@ class DriversService {
 
   async updateDriverStatus(uuid: string, active: boolean): Promise<ApiDriver> {
     try {
-      console.log('🔍 [DriversService] Mise à jour statut chauffeur...', uuid, active)
+      console.log('🔍 [DriversService] Mise à jour statut chauffeur via Users API...', uuid, active)
 
-      const response = await authService.authenticatedFetch(`${this.baseURL}/drivers/${uuid}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ active })
-      })
+      // Récupérer le chauffeur pour obtenir l'UUID utilisateur associé
+      const driver = await this.getDriver(uuid)
+      const userUuid = driver.user.uuid
 
-      const data: ApiResponse<ApiDriver> = await response.json()
-      console.log('🔍 [DriversService] Réponse API update status:', data)
+      // Mettre à jour le statut de l'utilisateur associé
+      await usersService.updateUser(userUuid, { active })
 
-      if (!data.valid || data.status !== 200) {
-        console.log('❌ [DriversService] Erreur API update status:', data.message)
-        throw new Error(data.message || 'Erreur lors de la mise à jour du statut')
-      }
-
-      console.log('✅ [DriversService] Statut mis à jour:', data.data)
-      return data.data
+      // Récupérer et retourner le chauffeur mis à jour
+      const updatedDriver = await this.getDriver(uuid)
+      console.log('✅ [DriversService] Statut mis à jour via Users API:', updatedDriver.user.active)
+      return updatedDriver
     } catch (error) {
-      console.error('❌ [DriversService] Erreur updateDriverStatus:', error)
+      console.error('❌ [DriversService] Erreur updateDriverStatus (Users API):', error)
       if (error instanceof Error) {
         throw error
       }
