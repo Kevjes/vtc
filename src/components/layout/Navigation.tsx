@@ -16,10 +16,12 @@ import {
   ClipboardDocumentListIcon,
   ShieldCheckIcon,
   KeyIcon,
-  ComputerDesktopIcon
+  ComputerDesktopIcon,
+  UserIcon
 } from '@heroicons/react/24/outline'
 import type { NavigationItem } from '@/types'
 import { Badge } from '@/components/ui'
+import { usePermissions } from '@/hooks/usePermissions'
 
 const navigationItems: NavigationItem[] = [
   // Navigation principale
@@ -27,36 +29,91 @@ const navigationItems: NavigationItem[] = [
     title: 'Dashboard',
     href: '/',
     icon: HomeIcon,
+    // Accessible à tous les utilisateurs authentifiés
   },
   {
     title: 'Chauffeurs',
     href: '/drivers',
     icon: UsersIcon,
     badge: 5,
+    permissions: ['CAN_READ_ANY_DRIVER', 'CAN_READ_DRIVER', 'CAN_READ_OWN_DRIVER'],
     children: [
-      { title: 'Liste des chauffeurs', href: '/drivers', icon: UsersIcon },
-      { title: 'Nouveau chauffeur', href: '/drivers/new', icon: UsersIcon },
+      {
+        title: 'Liste des chauffeurs',
+        href: '/drivers',
+        icon: UsersIcon,
+        permissions: ['CAN_READ_ANY_DRIVER', 'CAN_READ_DRIVER', 'CAN_READ_OWN_DRIVER']
+      },
+      {
+        title: 'Nouveau chauffeur',
+        href: '/drivers/new',
+        icon: UsersIcon,
+        permissions: ['CAN_CREATE_DRIVER']
+      },
     ]
   },
   {
     title: 'Partenaires',
     href: '/partners',
     icon: UserGroupIcon,
+    permissions: ['CAN_READ_ANY_PARTNER', 'CAN_READ_PARTNER', 'CAN_READ_OWN_PARTNER'],
     children: [
-      { title: 'Liste des partenaires', href: '/partners', icon: UserGroupIcon },
-      { title: 'Nouveau partenaire', href: '/partners/new', icon: UserGroupIcon },
+      {
+        title: 'Liste des partenaires',
+        href: '/partners',
+        icon: UserGroupIcon,
+        permissions: ['CAN_READ_ANY_PARTNER', 'CAN_READ_PARTNER', 'CAN_READ_OWN_PARTNER']
+      },
+      {
+        title: 'Nouveau partenaire',
+        href: '/partners/new',
+        icon: UserGroupIcon,
+        permissions: ['CAN_CREATE_PARTNER']
+      },
     ]
+  },
+  {
+    title: 'Agents',
+    href: '/agents',
+    icon: UserIcon,
+    permissions: ['CAN_READ_ANY_AGENT', 'CAN_READ_AGENT', 'CAN_READ_OWN_AGENT'],
   },
   {
     title: 'Évaluations',
     href: '/evaluations',
     icon: StarIcon,
+    permissions: ['CAN_READ_ANY_EVALUATION', 'CAN_READ_EVALUATION', 'CAN_READ_OWN_EVALUATION'],
     children: [
-      { title: 'Liste des évaluations', href: '/evaluations', icon: StarIcon },
-      { title: 'Gestion des statuts', href: '/evaluations/status', icon: StarIcon },
-      { title: 'Statistiques', href: '/evaluations/stats', icon: StarIcon },
-      { title: 'Critères', href: '/evaluations/criteria', icon: StarIcon },
-      { title: 'Templates', href: '/evaluations/templates', icon: StarIcon },
+      {
+        title: 'Liste des évaluations',
+        href: '/evaluations',
+        icon: StarIcon,
+        permissions: ['CAN_READ_ANY_EVALUATION', 'CAN_READ_EVALUATION', 'CAN_READ_OWN_EVALUATION']
+      },
+      {
+        title: 'Gestion des statuts',
+        href: '/evaluations/status',
+        icon: StarIcon,
+        permissions: ['CAN_UPDATE_EVALUATION']
+      },
+      {
+        title: 'Statistiques',
+        href: '/evaluations/stats',
+        icon: StarIcon,
+        permissions: ['CAN_READ_ANY_EVALUATION']
+      },
+      {
+        title: 'Critères',
+        href: '/evaluations/criteria',
+        icon: StarIcon,
+        permissions: ['CAN_READ_ANY_EVALUATION_CRITERIA', 'CAN_READ_EVALUATION_CRITERIA']
+      },
+      {
+        title: 'Templates',
+        href: '/evaluations/templates',
+        icon: StarIcon,
+        permissions: ['CAN_READ_ANY_EVALUATION_TEMPLATE', 'CAN_READ_EVALUATION_TEMPLATE']
+      },
     ]
   },
 
@@ -65,21 +122,25 @@ const navigationItems: NavigationItem[] = [
     title: 'Utilisateurs',
     href: '/admin/users',
     icon: UsersIcon,
+    permissions: ['CAN_READ_ANY_USER', 'CAN_READ_USER'],
   },
   {
     title: 'Rôles',
     href: '/admin/roles',
     icon: ShieldCheckIcon,
+    permissions: ['CAN_READ_ANY_ROLE', 'CAN_READ_ROLE'],
   },
   {
     title: 'Sessions',
     href: '/admin/sessions',
     icon: ComputerDesktopIcon,
+    permissions: ['CAN_READ_ANY_SESSION', 'CAN_READ_SESSION'],
   },
   {
     title: 'Permissions',
     href: '/admin/permissions',
     icon: KeyIcon,
+    permissions: ['CAN_READ_ANY_PERMISSION', 'CAN_READ_PERMISSION'],
   },
 
   // Outils et fonctionnalités
@@ -87,17 +148,20 @@ const navigationItems: NavigationItem[] = [
     title: 'Import/Export',
     href: '/import-export',
     icon: DocumentArrowUpIcon,
+    // Accessible à tous pour l'instant
   },
   {
     title: 'Reporting',
     href: '/reporting',
     icon: ChartBarIcon,
+    permissions: ['CAN_VIEW_REPORTS'],
   },
   {
     title: 'Notifications',
     href: '/notifications',
     icon: BellIcon,
     badge: 3,
+    permissions: ['CAN_READ_ANY_NOTIFICATION', 'CAN_READ_NOTIFICATION', 'CAN_READ_OWN_NOTIFICATION'],
   },
 
   // Configuration et audit
@@ -105,11 +169,13 @@ const navigationItems: NavigationItem[] = [
     title: 'Paramètres',
     href: '/settings',
     icon: Cog6ToothIcon,
+    permissions: ['CAN_READ_ANY_SETTING', 'CAN_READ_SETTING'],
   },
   {
     title: 'Audit',
     href: '/audit',
     icon: ClipboardDocumentListIcon,
+    permissions: ['CAN_READ_ANY_ACTIVITY_LOGS', 'CAN_READ_ACTIVITY_LOGS'],
   },
 ]
 
@@ -119,6 +185,27 @@ interface NavigationProps {
 
 export function Navigation({ collapsed = false }: NavigationProps) {
   const pathname = usePathname()
+  const { hasAnyPermission, hasAllPermissions, hasAllAccess } = usePermissions()
+
+  // Fonction pour vérifier si l'utilisateur a accès à un élément de navigation
+  const hasAccessToItem = (item: NavigationItem): boolean => {
+    // Si pas de permissions requises, accessible à tous
+    if (!item.permissions || item.permissions.length === 0) {
+      return true
+    }
+
+    // Si l'utilisateur a ALL_ACCESS, il a accès à tout
+    if (hasAllAccess()) {
+      return true
+    }
+
+    // Vérifier les permissions
+    if (item.requireAllPermissions) {
+      return hasAllPermissions(item.permissions)
+    } else {
+      return hasAnyPermission(item.permissions)
+    }
+  }
 
   // Fonction pour déterminer si un élément est actif
   const isItemActive = (item: NavigationItem) => {
@@ -127,21 +214,66 @@ export function Navigation({ collapsed = false }: NavigationProps) {
       return pathname === item.href
     }
     // Sinon, logique normale
-    return pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
+    return pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href + '/'))
   }
 
   // Fonction pour déterminer si un enfant est actif
   const isChildActive = (child: NavigationItem, parent: NavigationItem) => {
-    return pathname === child.href || (child.href !== parent.href && pathname.startsWith(child.href + '/'))
+    return pathname === child.href || (child.href !== parent.href && pathname?.startsWith(child.href + '/'))
   }
 
-  // Groupes d'éléments avec séparateurs
-  const groups = [
-    { items: navigationItems.slice(0, 4) }, // Navigation principale
-    { items: navigationItems.slice(4, 8) }, // Gestion utilisateurs et accès
-    { items: navigationItems.slice(8, 11) }, // Outils et fonctionnalités
-    { items: navigationItems.slice(11) }, // Configuration et audit
-  ]
+  // Filtrer les éléments de navigation selon les permissions
+  const filterItemsByPermissions = (items: NavigationItem[]): NavigationItem[] => {
+    return items
+      .filter(item => hasAccessToItem(item))
+      .map(item => {
+        // Si l'item a des enfants, les filtrer aussi
+        if (item.children && item.children.length > 0) {
+          const filteredChildren = item.children.filter(child => hasAccessToItem(child))
+          // Si l'item parent n'a plus d'enfants après filtrage, ne pas l'afficher
+          return filteredChildren.length > 0 ? { ...item, children: filteredChildren } : null
+        }
+        return item
+      })
+      .filter((item): item is NavigationItem => item !== null)
+  }
+
+  // Filtrer tous les éléments de navigation
+  const filteredNavigationItems = filterItemsByPermissions(navigationItems)
+
+  // Groupes d'éléments avec séparateurs (recalculer après filtrage)
+  const getGroups = () => {
+    const items = filteredNavigationItems
+    const groups: { items: NavigationItem[] }[] = []
+
+    // Navigation principale (Dashboard + modules principaux)
+    const mainNav = items.filter(item =>
+      ['/', '/drivers', '/partners', '/agents', '/evaluations'].includes(item.href)
+    )
+    if (mainNav.length > 0) groups.push({ items: mainNav })
+
+    // Gestion utilisateurs et accès
+    const adminNav = items.filter(item =>
+      item.href.startsWith('/admin')
+    )
+    if (adminNav.length > 0) groups.push({ items: adminNav })
+
+    // Outils et fonctionnalités
+    const toolsNav = items.filter(item =>
+      ['/import-export', '/reporting', '/notifications'].includes(item.href)
+    )
+    if (toolsNav.length > 0) groups.push({ items: toolsNav })
+
+    // Configuration et audit
+    const configNav = items.filter(item =>
+      ['/settings', '/audit'].includes(item.href)
+    )
+    if (configNav.length > 0) groups.push({ items: configNav })
+
+    return groups
+  }
+
+  const groups = getGroups()
 
   return (
     <nav className="space-y-1">

@@ -2,24 +2,27 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
+import {
   ArrowLeftIcon,
   BuildingOfficeIcon,
   UserIcon,
   MapPinIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { DashboardLayout } from '@/components/layout'
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  Button, 
-  Input, 
-  Select, 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Button,
+  Input,
+  Select,
   Textarea
 } from '@/components/ui'
+import { PartnerPermissions } from '@/types'
+import { usePermissions } from '@/hooks/usePermissions'
 
 interface PartnerFormData {
   // Informations entreprise
@@ -86,6 +89,11 @@ const countryOptions = [
 
 export default function NewPartnerPage() {
   const router = useRouter()
+  const { hasPermission, hasAllAccess } = usePermissions()
+
+  // Permission check
+  const canCreatePartner = hasAllAccess() || hasPermission(PartnerPermissions.CREATE_PARTNER)
+
   const [formData, setFormData] = useState<PartnerFormData>({
     companyName: '',
     businessType: '',
@@ -164,14 +172,20 @@ export default function NewPartnerPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
+    // Check permission before creating
+    if (!canCreatePartner) {
+      alert("Vous n'avez pas la permission de créer un partenaire")
+      return
+    }
+
     if (!validateForm()) {
       return
     }
 
     setIsSubmitting(true)
-    
-    try {
+
+    try{
       // Simulation d'appel API
       await new Promise(resolve => setTimeout(resolve, 2000))
       
@@ -190,6 +204,36 @@ export default function NewPartnerPage() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }))
     }
+  }
+
+  // Check if user has permission to access this page
+  if (!canCreatePartner) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="p-8 max-w-md text-center">
+            <div className="mb-4">
+              <ShieldCheckIcon className="h-16 w-16 text-red-500 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+              Accès non autorisé
+            </h2>
+            <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+              Vous n'avez pas les permissions nécessaires pour créer un partenaire.
+            </p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Permission requise: CAN_CREATE_PARTNER
+            </p>
+            <div className="mt-6">
+              <Button onClick={() => router.back()}>
+                <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                Retour
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (

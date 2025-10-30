@@ -5,15 +5,55 @@ import { useParams, useRouter } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { Card, Button, Badge } from '@/components/ui'
 import { agentsService } from '@/services/agents'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 import type { ApiAgent } from '@/types'
+import { AgentPermissions } from '@/types'
 
 export default function AgentDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { user } = useAuth()
+  const { hasPermission, hasAnyPermission, hasAllAccess } = usePermissions()
   const uuid = typeof params?.uuid === 'string' ? params.uuid : ''
   const [agent, setAgent] = useState<ApiAgent | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Permission checks
+  const canReadAgent = hasAllAccess() || hasAnyPermission([
+    AgentPermissions.READ_ANY_AGENT,
+    AgentPermissions.READ_AGENT,
+    AgentPermissions.READ_OWN_AGENT
+  ])
+  const canUpdateAgent = hasAllAccess() || hasPermission(AgentPermissions.UPDATE_AGENT)
+  const canUpdateOwnAgent = hasAllAccess() || hasPermission(AgentPermissions.UPDATE_OWN_AGENT)
+  const canDeleteAgent = hasAllAccess() || hasPermission(AgentPermissions.DELETE_AGENT)
+  const canDeleteOwnAgent = hasAllAccess() || hasPermission(AgentPermissions.DELETE_OWN_AGENT)
+
+  // Permission helpers
+  const isOwnAgent = (agentData: ApiAgent) => {
+    // Own agent if user is the agent's user OR if user's partner is the agent's partner
+    return user?.uuid === agentData.user?.uuid || user?.partnerId === agentData.partner?.uuid
+  }
+
+  const canUpdateThisAgent = (agentData: ApiAgent) => {
+    if (hasAllAccess()) return true
+    if (canUpdateAgent) return true
+    if (canUpdateOwnAgent && isOwnAgent(agentData)) return true
+    return false
+  }
+
+  const canDeleteThisAgent = (agentData: ApiAgent) => {
+    if (hasAllAccess()) return true
+    if (canDeleteAgent) return true
+    if (canDeleteOwnAgent && isOwnAgent(agentData)) return true
+    return false
+  }
+
+  // Determine actual permissions based on ownership
+  const canEdit = agent ? canUpdateThisAgent(agent) : false
+  const canDelete = agent ? canDeleteThisAgent(agent) : false
 
   useEffect(() => {
     if (!uuid) return
@@ -33,6 +73,22 @@ export default function AgentDetailPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show access denied if user doesn't have permission
+  if (!canReadAgent) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">Accès refusé</h2>
+            <p className="text-red-700 dark:text-red-300">
+              Vous n'avez pas la permission de consulter les détails de cet agent.
+            </p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   if (loading) {
@@ -72,6 +128,17 @@ export default function AgentDetailPage() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.push('/agents')}>Retour</Button>
+            {canEdit && (
+              <Button onClick={() => router.push(`/agents/${uuid}/edit`)}>Modifier</Button>
+            )}
+            {canDelete && (
+              <Button variant="danger" onClick={() => {
+                if (confirm('Êtes-vous sûr de vouloir supprimer cet agent ?')) {
+                  // TODO: Implement delete functionality
+                  console.log('Delete agent:', uuid)
+                }
+              }}>Supprimer</Button>
+            )}
           </div>
         </div>
 

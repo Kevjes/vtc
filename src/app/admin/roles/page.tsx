@@ -3,12 +3,18 @@
 import React, { useState, useEffect } from 'react'
 import { DashboardLayout } from '@/components/layout'
 import { Button, Card, Input, Modal, Badge } from '@/components/ui'
-import { PlusIcon, PencilIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, PencilIcon, EyeIcon, TrashIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
 import { rolesService } from '@/services/roles'
 import { permissionsService } from '@/services/permissions'
+import { RolePermissions } from '@/types'
 import type { ApiRole, ApiPermission, CreateRoleRequest, UpdateRoleRequest } from '@/types'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function RolesPage() {
+  const { user } = useAuth()
+  const { hasPermission, hasAnyPermission, hasAllAccess } = usePermissions()
+
   const [roles, setRoles] = useState<ApiRole[]>([])
   const [permissions, setPermissions] = useState<ApiPermission[]>([])
   const [loading, setLoading] = useState(true)
@@ -17,6 +23,37 @@ export default function RolesPage() {
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [totalElements, setTotalElements] = useState(0)
+
+  // Permission checks
+  const canViewRoles = hasAllAccess() || hasAnyPermission([
+    RolePermissions.READ_ANY_ROLE,
+    RolePermissions.READ_ROLE,
+    RolePermissions.READ_OWN_ROLE
+  ])
+  const canCreateRole = hasAllAccess() || hasPermission(RolePermissions.CREATE_ROLE)
+  const canUpdateRole = hasAllAccess() || hasPermission(RolePermissions.UPDATE_ROLE)
+  const canUpdateOwnRole = hasAllAccess() || hasPermission(RolePermissions.UPDATE_OWN_ROLE)
+  const canDeleteRole = hasAllAccess() || hasPermission(RolePermissions.DELETE_ROLE)
+  const canDeleteOwnRole = hasAllAccess() || hasPermission(RolePermissions.DELETE_OWN_ROLE)
+
+  // Helper to check if role belongs to current user (via user's roles)
+  const isOwnRole = (targetRole: ApiRole) => {
+    return user?.roles?.some(r => r.uuid === targetRole.uuid) || false
+  }
+
+  // Helper to check if user can update a specific role
+  const canUpdateThisRole = (targetRole: ApiRole) => {
+    if (hasAllAccess() || canUpdateRole) return true
+    if (canUpdateOwnRole && isOwnRole(targetRole)) return true
+    return false
+  }
+
+  // Helper to check if user can delete a specific role
+  const canDeleteThisRole = (targetRole: ApiRole) => {
+    if (hasAllAccess() || canDeleteRole) return true
+    if (canDeleteOwnRole && isOwnRole(targetRole)) return true
+    return false
+  }
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -71,6 +108,12 @@ export default function RolesPage() {
   }
 
   const handleCreate = async () => {
+    // Check permission before creation
+    if (!canCreateRole) {
+      setError("Vous n'avez pas la permission de créer un rôle")
+      return
+    }
+
     try {
       setLoading(true)
       await rolesService.createRole(formData)
@@ -86,6 +129,13 @@ export default function RolesPage() {
 
   const handleEdit = async () => {
     if (!selectedRole) return
+
+    // Check permission before update
+    if (!canUpdateThisRole(selectedRole)) {
+      setError("Vous n'avez pas la permission de modifier ce rôle")
+      return
+    }
+
     try {
       setLoading(true)
       const updateData: UpdateRoleRequest = {
@@ -105,7 +155,14 @@ export default function RolesPage() {
   }
 
   const handleDelete = async (role: ApiRole) => {
+    // Check permission before deletion
+    if (!canDeleteThisRole(role)) {
+      setError("Vous n'avez pas la permission de supprimer ce rôle")
+      return
+    }
+
     if (!confirm(`Êtes-vous sûr de vouloir supprimer le rôle "${role.name}" ?`)) return
+
     try {
       setLoading(true)
       await rolesService.deleteRole(role.uuid)
@@ -171,6 +228,28 @@ export default function RolesPage() {
     role.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Check if user has permission to view this page
+  if (!canViewRoles) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="p-8 max-w-md text-center">
+            <div className="mb-4">
+              <ShieldCheckIcon className="h-16 w-16 text-red-500 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-2">Accès non autorisé</h2>
+            <p className="text-neutral-600 mb-4">
+              Vous n'avez pas les permissions nécessaires pour accéder à la gestion des rôles.
+            </p>
+            <p className="text-sm text-neutral-500">
+              Permissions requises: CAN_READ_ANY_ROLE, CAN_READ_ROLE ou CAN_READ_OWN_ROLE
+            </p>
+          </Card>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -183,10 +262,12 @@ export default function RolesPage() {
               Gérez les rôles et leurs permissions
             </p>
           </div>
-          <Button onClick={openCreateModal} className="flex items-center gap-2">
-            <PlusIcon className="h-4 w-4" />
-            Nouveau Rôle
-          </Button>
+          {canCreateRole && (
+            <Button onClick={openCreateModal} className="flex items-center gap-2">
+              <PlusIcon className="h-4 w-4" />
+              Nouveau Rôle
+            </Button>
+          )}
         </div>
 
         {error && (
@@ -272,24 +353,31 @@ export default function RolesPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => openViewModal(role)}
+                            title="Voir les détails"
                           >
                             <EyeIcon className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditModal(role)}
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(role)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
+                          {canUpdateThisRole(role) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditModal(role)}
+                              title="Modifier"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canDeleteThisRole(role) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(role)}
+                              className="text-red-600 hover:text-red-700"
+                              title="Supprimer"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

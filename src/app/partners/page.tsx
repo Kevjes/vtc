@@ -9,12 +9,16 @@ import {
   EyeIcon,
   PencilIcon,
   TrashIcon,
-  BuildingOfficeIcon
+  BuildingOfficeIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { DashboardLayout } from '@/components/layout'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Avatar, Modal } from '@/components/ui'
 import { partnersService } from '@/services/partners'
 import type { ApiPartner } from '@/types'
+import { PartnerPermissions } from '@/types'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 
 const getStatusBadge = (status: string) => {
   switch (status?.toUpperCase()) {
@@ -31,6 +35,42 @@ const getStatusBadge = (status: string) => {
 
 export default function PartnersPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const { hasPermission, hasAnyPermission, hasAllAccess } = usePermissions()
+
+  // Permission checks
+  const canViewPartners = hasAllAccess() || hasAnyPermission([
+    PartnerPermissions.READ_ANY_PARTNER,
+    PartnerPermissions.READ_PARTNER,
+    PartnerPermissions.READ_OWN_PARTNER
+  ])
+  const canCreatePartner = hasAllAccess() || hasPermission(PartnerPermissions.CREATE_PARTNER)
+  const canUpdatePartner = hasAllAccess() || hasPermission(PartnerPermissions.UPDATE_PARTNER)
+  const canUpdateOwnPartner = hasAllAccess() || hasPermission(PartnerPermissions.UPDATE_OWN_PARTNER)
+  const canDeletePartner = hasAllAccess() || hasPermission(PartnerPermissions.DELETE_PARTNER)
+  const canDeleteOwnPartner = hasAllAccess() || hasPermission(PartnerPermissions.DELETE_OWN_PARTNER)
+
+  // Helper to check if partner belongs to current user
+  const isOwnPartner = (partner: ApiPartner) => {
+    // Un partenaire appartient à l'utilisateur si l'utilisateur est lié à ce partenaire
+    // (par exemple via partner.userId ou une relation similaire)
+    return user?.partnerId === partner.uuid
+  }
+
+  // Helper to check if user can update a specific partner
+  const canUpdateThisPartner = (partner: ApiPartner) => {
+    if (hasAllAccess() || canUpdatePartner) return true
+    if (canUpdateOwnPartner && isOwnPartner(partner)) return true
+    return false
+  }
+
+  // Helper to check if user can delete a specific partner
+  const canDeleteThisPartner = (partner: ApiPartner) => {
+    if (hasAllAccess() || canDeletePartner) return true
+    if (canDeleteOwnPartner && isOwnPartner(partner)) return true
+    return false
+  }
+
   const [partners, setPartners] = useState<ApiPartner[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -46,17 +86,38 @@ export default function PartnersPage() {
   const pageSize = 10
 
   useEffect(() => {
-    loadPartners()
-  }, [currentPage, searchTerm, filterStatus])
+    if (user) {
+      loadPartners()
+    }
+  }, [currentPage, searchTerm, filterStatus, user])
 
   const loadPartners = async () => {
     try {
       setLoading(true)
       setError(null)
+
+      // Build SpringFilter query based on permissions
+      let springFilter = searchTerm || ''
+
+      // If user only has READ_OWN_PARTNER permission, filter by their partnerId
+      const hasReadAny = hasAllAccess() || hasPermission(PartnerPermissions.READ_ANY_PARTNER)
+      const hasReadGeneral = hasAllAccess() || hasPermission(PartnerPermissions.READ_PARTNER)
+      const hasReadOwn = hasPermission(PartnerPermissions.READ_OWN_PARTNER)
+
+      if (!hasReadAny && !hasReadGeneral && hasReadOwn && user?.partnerId) {
+        // User can only see their own partner
+        const ownPartnerFilter = `uuid : '${user.partnerId}'`
+        if (springFilter) {
+          springFilter = `(${springFilter}) and ${ownPartnerFilter}`
+        } else {
+          springFilter = ownPartnerFilter
+        }
+      }
+
       const response = await partnersService.getPartners({
         page: currentPage,
         size: pageSize,
-        filter: searchTerm || undefined,
+        filter: springFilter || undefined,
         status: filterStatus === 'all' ? undefined : filterStatus
       })
       setPartners(response.content)
@@ -91,12 +152,25 @@ export default function PartnersPage() {
   }
 
   const handleDeletePartner = (partner: ApiPartner) => {
+    // Check permission before showing delete modal
+    if (!canDeleteThisPartner(partner)) {
+      setError("Vous n'avez pas la permission de supprimer ce partenaire")
+      return
+    }
     setSelectedPartner(partner)
     setShowDeleteModal(true)
   }
 
   const confirmDelete = async () => {
     if (!selectedPartner) return
+
+    // Double check permission before deletion
+    if (!canDeleteThisPartner(selectedPartner)) {
+      setError("Vous n'avez pas la permission de supprimer ce partenaire")
+      setShowDeleteModal(false)
+      return
+    }
+
     try {
       setLoading(true)
       await partnersService.deletePartner(selectedPartner.uuid)
@@ -114,6 +188,30 @@ export default function PartnersPage() {
   const pendingPartnersCount = filteredPartners.filter(p => p.status === 'PENDING').length
   const suspendedPartnersCount = filteredPartners.filter(p => p.status === 'SUSPENDED').length
 
+  // Check if user has permission to view this page
+  if (!canViewPartners) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="p-8 max-w-md text-center">
+            <div className="mb-4">
+              <ShieldCheckIcon className="h-16 w-16 text-red-500 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+              Accès non autorisé
+            </h2>
+            <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+              Vous n'avez pas les permissions nécessaires pour accéder à la gestion des partenaires.
+            </p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Permissions requises: CAN_READ_ANY_PARTNER, CAN_READ_PARTNER ou CAN_READ_OWN_PARTNER
+            </p>
+          </Card>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -127,10 +225,12 @@ export default function PartnersPage() {
               Gérez les partenaires de votre réseau VTC
             </p>
           </div>
-          <Button onClick={() => router.push('/partners/new')}>
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Nouveau partenaire
-          </Button>
+          {canCreatePartner && (
+            <Button onClick={() => router.push('/partners/new')}>
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Nouveau partenaire
+            </Button>
+          )}
         </div>
 
         {error && (
@@ -359,32 +459,33 @@ export default function PartnersPage() {
                           >
                             <EyeIcon className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEditPartner(partner.uuid)
-                            }}
-                            title="Modifier (Non disponible)"
-                            disabled={true}
-                            className="opacity-50 cursor-not-allowed"
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeletePartner(partner)
-                            }}
-                            title="Supprimer (Non disponible)"
-                            disabled={true}
-                            className="text-red-600 hover:text-red-700 opacity-50 cursor-not-allowed"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
+                          {canUpdateThisPartner(partner) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditPartner(partner.uuid)
+                              }}
+                              title="Modifier"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canDeleteThisPartner(partner) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeletePartner(partner)
+                              }}
+                              title="Supprimer"
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

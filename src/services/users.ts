@@ -149,6 +149,33 @@ class UsersService {
       throw new Error('Erreur de connexion au serveur')
     }
   }
+
+  async deleteUser(uuid: string): Promise<void> {
+    try {
+      console.log('🔍 [UsersService] Suppression utilisateur...', uuid)
+
+      const response = await fetch(`${this.baseURL}/users/${uuid}`, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      })
+
+      const data: ApiResponse<void> = await response.json()
+      console.log('🔍 [UsersService] Réponse API delete user:', data)
+
+      if (!data.valid || data.status !== 200) {
+        console.log('❌ [UsersService] Erreur API delete user:', data.message)
+        throw new Error(data.message || 'Erreur lors de la suppression de l\'utilisateur')
+      }
+
+      console.log('✅ [UsersService] Utilisateur supprimé')
+    } catch (error) {
+      console.error('❌ [UsersService] Erreur deleteUser:', error)
+      if (error instanceof Error) {
+        throw error
+      }
+      throw new Error('Erreur de connexion au serveur')
+    }
+  }
 }
 
 export const usersService = new UsersService()

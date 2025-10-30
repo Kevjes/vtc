@@ -8,7 +8,8 @@ import {
     PlusIcon,
     MinusIcon,
     StarIcon,
-    CheckCircleIcon
+    CheckCircleIcon,
+    ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import { DashboardLayout } from '@/components/layout'
@@ -17,7 +18,9 @@ import { evaluationsService, ApiEvaluation, UpdateEvaluationRequest } from '@/se
 import { evaluationTemplatesService } from '@/services/evaluationTemplates'
 import { driversService } from '@/services/driversService'
 import { partnersService } from '@/services/partnersService'
-import { ApiEvaluationTemplate, ApiDriver, ApiPartner } from '@/types'
+import { ApiEvaluationTemplate, ApiDriver, ApiPartner, EvaluationPermissions } from '@/types'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 import '@/styles/templates.css'
 
 interface EvaluationScore {
@@ -103,6 +106,8 @@ export default function EditEvaluationPage() {
     const router = useRouter()
     const params = useParams()
     const evaluationId = params?.id as string
+    const { user } = useAuth()
+    const { hasPermission, hasAllAccess } = usePermissions()
 
     // États pour les données
     const [evaluation, setEvaluation] = useState<ApiEvaluation | null>(null)
@@ -110,6 +115,24 @@ export default function EditEvaluationPage() {
     const [partners, setPartners] = useState<ApiPartner[]>([])
     const [templates, setTemplates] = useState<ApiEvaluationTemplate[]>([])
     const [selectedTemplate, setSelectedTemplate] = useState<ApiEvaluationTemplate | null>(null)
+
+    // Permission checks
+    const canUpdateEvaluation = hasAllAccess() || hasPermission(EvaluationPermissions.UPDATE_EVALUATION)
+    const canUpdateOwnEvaluation = hasAllAccess() || hasPermission(EvaluationPermissions.UPDATE_OWN_EVALUATION)
+
+    // Helper to check if evaluation belongs to current user
+    const isOwnEvaluation = (ev: ApiEvaluation | null) => {
+      if (!ev) return false
+      return user?.uuid === ev.driver?.user?.uuid
+    }
+
+    // Helper to check if user can update this specific evaluation
+    const canUpdateThisEvaluation = (ev: ApiEvaluation | null) => {
+      if (!ev) return false
+      if (hasAllAccess() || canUpdateEvaluation) return true
+      if (canUpdateOwnEvaluation && isOwnEvaluation(ev)) return true
+      return false
+    }
 
     // États pour le formulaire
     const [formData, setFormData] = useState({
@@ -226,6 +249,12 @@ export default function EditEvaluationPage() {
     const handleSave = async () => {
         if (!evaluation) return
 
+        // Check permission before updating
+        if (!canUpdateThisEvaluation(evaluation)) {
+            setError("Vous n'avez pas la permission de modifier cette évaluation")
+            return
+        }
+
         setIsSaving(true)
         setError(null)
 
@@ -289,6 +318,36 @@ export default function EditEvaluationPage() {
                             {error || 'Évaluation non trouvée'}
                         </p>
                     </div>
+                </div>
+            </DashboardLayout>
+        )
+    }
+
+    // Check if user has permission to edit this evaluation
+    if (!canUpdateThisEvaluation(evaluation)) {
+        return (
+            <DashboardLayout>
+                <div className="flex items-center justify-center min-h-[60vh]">
+                    <Card className="p-8 max-w-md text-center">
+                        <div className="mb-4">
+                            <ShieldCheckIcon className="h-16 w-16 text-red-500 mx-auto" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+                            Accès non autorisé
+                        </h2>
+                        <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+                            Vous n'avez pas les permissions nécessaires pour modifier cette évaluation.
+                        </p>
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                            Permissions requises: CAN_UPDATE_EVALUATION ou CAN_UPDATE_OWN_EVALUATION
+                        </p>
+                        <div className="mt-6">
+                            <Button onClick={() => router.push('/evaluations')}>
+                                <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                                Retour aux évaluations
+                            </Button>
+                        </div>
+                    </Card>
                 </div>
             </DashboardLayout>
         )

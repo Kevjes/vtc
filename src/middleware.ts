@@ -10,6 +10,7 @@ const protectedRoutes = [
   '/drivers',
   '/partners',
   '/evaluations',
+  '/agents',
   '/admin',
   '/settings',
   '/reporting',

@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  PlusIcon, 
+import {
+  PlusIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
   EyeIcon,
@@ -11,14 +11,17 @@ import {
   ChartBarIcon,
   ClockIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { StarIcon } from '@heroicons/react/24/solid'
 import { DashboardLayout } from '@/components/layout'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Avatar, Select } from '@/components/ui'
 import { evaluationsService, ApiEvaluation } from '@/services/evaluations'
 import { evaluationStatsService, EvaluationStats } from '@/services/evaluationStats'
-import { PaginatedResponse } from '@/types'
+import { PaginatedResponse, EvaluationPermissions } from '@/types'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 import '@/styles/templates.css'
 
 // Types pour l'interface
@@ -71,13 +74,47 @@ const getStatusIcon = (status: ApiEvaluation['status']) => {
 
 export default function EvaluationsPage() {
   const router = useRouter()
-  
+  const { user } = useAuth()
+  const { hasPermission, hasAnyPermission, hasAllAccess } = usePermissions()
+
+  // Permission checks
+  const canViewEvaluations = hasAllAccess() || hasAnyPermission([
+    EvaluationPermissions.READ_ANY_EVALUATION,
+    EvaluationPermissions.READ_EVALUATION,
+    EvaluationPermissions.READ_OWN_EVALUATION
+  ])
+  const canCreateEvaluation = hasAllAccess() || hasPermission(EvaluationPermissions.CREATE_EVALUATION)
+  const canUpdateEvaluation = hasAllAccess() || hasPermission(EvaluationPermissions.UPDATE_EVALUATION)
+  const canUpdateOwnEvaluation = hasAllAccess() || hasPermission(EvaluationPermissions.UPDATE_OWN_EVALUATION)
+  const canDeleteEvaluation = hasAllAccess() || hasPermission(EvaluationPermissions.DELETE_EVALUATION)
+  const canDeleteOwnEvaluation = hasAllAccess() || hasPermission(EvaluationPermissions.DELETE_OWN_EVALUATION)
+
+  // Helper to check if evaluation belongs to current user
+  const isOwnEvaluation = (evaluation: ApiEvaluation) => {
+    // Une évaluation appartient à l'utilisateur si c'est lui le chauffeur évalué
+    return user?.uuid === evaluation.driver?.user?.uuid
+  }
+
+  // Helper to check if user can update a specific evaluation
+  const canUpdateThisEvaluation = (evaluation: ApiEvaluation) => {
+    if (hasAllAccess() || canUpdateEvaluation) return true
+    if (canUpdateOwnEvaluation && isOwnEvaluation(evaluation)) return true
+    return false
+  }
+
+  // Helper to check if user can delete a specific evaluation
+  const canDeleteThisEvaluation = (evaluation: ApiEvaluation) => {
+    if (hasAllAccess() || canDeleteEvaluation) return true
+    if (canDeleteOwnEvaluation && isOwnEvaluation(evaluation)) return true
+    return false
+  }
+
   // États pour les données
   const [evaluations, setEvaluations] = useState<PaginatedResponse<ApiEvaluation> | null>(null)
   const [stats, setStats] = useState<EvaluationStats | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   // États pour les filtres
   const [filters, setFilters] = useState<EvaluationFilters>({
     search: '',
@@ -94,18 +131,28 @@ export default function EvaluationsPage() {
     setError(null)
     try {
       const params: any = { page, size }
-      
+
       // Construire le filtre
       let filterParts: string[] = []
-      
+
+      // If user only has READ_OWN_EVALUATION permission, filter by their UUID
+      const hasReadAny = hasAllAccess() || hasPermission(EvaluationPermissions.READ_ANY_EVALUATION)
+      const hasReadGeneral = hasAllAccess() || hasPermission(EvaluationPermissions.READ_EVALUATION)
+      const hasReadOwn = hasPermission(EvaluationPermissions.READ_OWN_EVALUATION)
+
+      if (!hasReadAny && !hasReadGeneral && hasReadOwn && user?.uuid) {
+        // User can only see their own evaluations (as a driver)
+        filterParts.push(`driver.user.uuid : '${user.uuid}'`)
+      }
+
       if (filters.status !== 'all') {
         filterParts.push(`status='${filters.status}'`)
       }
-      
+
       if (filters.period !== 'all') {
         const now = new Date()
         let startDate: Date
-        
+
         switch (filters.period) {
           case 'week':
             startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -122,16 +169,16 @@ export default function EvaluationsPage() {
           default:
             startDate = new Date(0)
         }
-        
+
         filterParts.push(`evaluationDate >= '${startDate.toISOString().split('T')[0]}'`)
       }
-      
+
       if (filters.search) {
         filterParts.push(`(driver.user.firstname LIKE '%${filters.search}%' OR driver.user.lastname LIKE '%${filters.search}%' OR partner.name LIKE '%${filters.search}%')`)
       }
-      
+
       if (filterParts.length > 0) {
-        params.filter = `(${filterParts.join(' AND ')})`
+        params.filter = filterParts.join(' AND ')
       }
 
       const data = await evaluationsService.getEvaluations(params)
@@ -152,9 +199,12 @@ export default function EvaluationsPage() {
 
   // Charger les données au montage et lors des changements de filtres
   useEffect(() => {
-    loadEvaluations()
+    // Wait for user to be loaded before fetching evaluations
+    if (user) {
+      loadEvaluations()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filters.status, filters.period])
+  }, [page, filters.status, filters.period, user])
 
   // Recherche avec délai
   useEffect(() => {
@@ -182,6 +232,30 @@ export default function EvaluationsPage() {
     setPage(0)
   }
 
+  // Check if user has permission to view this page
+  if (!canViewEvaluations) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="p-8 max-w-md text-center">
+            <div className="mb-4">
+              <ShieldCheckIcon className="h-16 w-16 text-red-500 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+              Accès non autorisé
+            </h2>
+            <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+              Vous n'avez pas les permissions nécessaires pour accéder aux évaluations.
+            </p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Permissions requises: CAN_READ_ANY_EVALUATION, CAN_READ_EVALUATION ou CAN_READ_OWN_EVALUATION
+            </p>
+          </Card>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -196,23 +270,25 @@ export default function EvaluationsPage() {
             </p>
           </div>
           <div className="flex items-center space-x-3">
-            <Button 
+            <Button
               variant="outline"
               onClick={() => router.push('/evaluations/status')}
             >
               Gestion des statuts
             </Button>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => router.push('/evaluations/stats')}
             >
               <ChartBarIcon className="h-4 w-4 mr-2" />
               Statistiques
             </Button>
-            <Button onClick={() => router.push('/evaluations/new')}>
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Nouvelle évaluation
-            </Button>
+            {canCreateEvaluation && (
+              <Button onClick={() => router.push('/evaluations/new')}>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Nouvelle évaluation
+              </Button>
+            )}
           </div>
         </div>
 
@@ -493,9 +569,9 @@ export default function EvaluationsPage() {
                         >
                           <EyeIcon className="h-3.5 w-3.5" />
                         </Button>
-                        {evaluation.status === 'PENDING' && (
-                          <Button 
-                            variant="ghost" 
+                        {evaluation.status === 'PENDING' && canUpdateThisEvaluation(evaluation) && (
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation()

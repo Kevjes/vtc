@@ -8,13 +8,17 @@ import {
   FunnelIcon,
   EyeIcon,
   PencilIcon,
-  TrashIcon
+  TrashIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { StarIcon } from '@heroicons/react/24/solid'
 import { DashboardLayout } from '@/components/layout'
 import { Card, Button, Input, Badge, Avatar, Modal } from '@/components/ui'
 import { driversService } from '@/services/drivers'
+import { DriverPermissions } from '@/types'
 import type { ApiDriver } from '@/types'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 
 const getStatusBadge = (active: boolean) => {
   return active
@@ -38,6 +42,9 @@ const getVehicleTypeLabel = (vehicleType: string) => {
 
 export default function DriversPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const { hasPermission, hasAnyPermission, hasAllAccess } = usePermissions()
+
   const [drivers, setDrivers] = useState<ApiDriver[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -50,20 +57,73 @@ export default function DriversPage() {
   const [totalPages, setTotalPages] = useState(0)
   const [totalElements, setTotalElements] = useState(0)
 
+  // Permission checks
+  const canViewDrivers = hasAllAccess() || hasAnyPermission([
+    DriverPermissions.READ_ANY_DRIVER,
+    DriverPermissions.READ_DRIVER,
+    DriverPermissions.READ_OWN_DRIVER
+  ])
+  const canCreateDriver = hasAllAccess() || hasPermission(DriverPermissions.CREATE_DRIVER)
+  const canUpdateDriver = hasAllAccess() || hasPermission(DriverPermissions.UPDATE_DRIVER)
+  const canUpdateOwnDriver = hasAllAccess() || hasPermission(DriverPermissions.UPDATE_OWN_DRIVER)
+  const canDeleteDriver = hasAllAccess() || hasPermission(DriverPermissions.DELETE_DRIVER)
+  const canDeleteOwnDriver = hasAllAccess() || hasPermission(DriverPermissions.DELETE_OWN_DRIVER)
+
+  // Helper to check if driver belongs to current user
+  const isOwnDriver = (targetDriver: ApiDriver) => {
+    return user?.uuid === targetDriver.user?.uuid
+  }
+
+  // Helper to check if user can update a specific driver
+  const canUpdateThisDriver = (targetDriver: ApiDriver) => {
+    if (hasAllAccess() || canUpdateDriver) return true
+    if (canUpdateOwnDriver && isOwnDriver(targetDriver)) return true
+    return false
+  }
+
+  // Helper to check if user can delete a specific driver
+  const canDeleteThisDriver = (targetDriver: ApiDriver) => {
+    if (hasAllAccess() || canDeleteDriver) return true
+    if (canDeleteOwnDriver && isOwnDriver(targetDriver)) return true
+    return false
+  }
+
   const pageSize = 10
 
   useEffect(() => {
-    loadDrivers()
-  }, [currentPage, searchTerm, filterStatus])
+    // Wait for user to be loaded before fetching drivers
+    if (user) {
+      loadDrivers()
+    }
+  }, [currentPage, searchTerm, filterStatus, user])
 
   const loadDrivers = async () => {
     try {
       setLoading(true)
       setError(null)
+
+      // Build SpringFilter query based on permissions
+      let springFilter = searchTerm || ''
+
+      // If user only has READ_OWN_DRIVER permission, filter by their UUID
+      const hasReadAny = hasAllAccess() || hasPermission(DriverPermissions.READ_ANY_DRIVER)
+      const hasReadGeneral = hasAllAccess() || hasPermission(DriverPermissions.READ_DRIVER)
+      const hasReadOwn = hasPermission(DriverPermissions.READ_OWN_DRIVER)
+
+      if (!hasReadAny && !hasReadGeneral && hasReadOwn && user?.uuid) {
+        // User can only see their own driver profile
+        const ownDriverFilter = `user.uuid : '${user.uuid}'`
+        if (springFilter) {
+          springFilter = `(${springFilter}) and ${ownDriverFilter}`
+        } else {
+          springFilter = ownDriverFilter
+        }
+      }
+
       const response = await driversService.getDrivers({
         page: currentPage,
         size: pageSize,
-        filter: searchTerm || undefined,
+        filter: springFilter || undefined,
         active: filterStatus === 'all' ? undefined : filterStatus === 'active'
       })
       setDrivers(response.content)
@@ -86,12 +146,25 @@ export default function DriversPage() {
   }
 
   const handleDeleteDriver = (driver: ApiDriver) => {
+    // Check permission before showing delete modal
+    if (!canDeleteThisDriver(driver)) {
+      setError("Vous n'avez pas la permission de supprimer ce chauffeur")
+      return
+    }
     setSelectedDriver(driver)
     setShowDeleteModal(true)
   }
 
   const confirmDelete = async () => {
     if (!selectedDriver) return
+
+    // Double check permission before deletion
+    if (!canDeleteThisDriver(selectedDriver)) {
+      setError("Vous n'avez pas la permission de supprimer ce chauffeur")
+      setShowDeleteModal(false)
+      return
+    }
+
     try {
       setLoading(true)
       await driversService.deleteDriver(selectedDriver.uuid)
@@ -120,6 +193,28 @@ export default function DriversPage() {
   const activeDriversCount = drivers.filter(d => d.user.active).length
   const inactiveDriversCount = drivers.filter(d => !d.user.active).length
 
+  // Check if user has permission to view this page
+  if (!canViewDrivers) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="p-8 max-w-md text-center">
+            <div className="mb-4">
+              <ShieldCheckIcon className="h-16 w-16 text-red-500 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-2">Accès non autorisé</h2>
+            <p className="text-neutral-600 mb-4">
+              Vous n'avez pas les permissions nécessaires pour accéder à la gestion des chauffeurs.
+            </p>
+            <p className="text-sm text-neutral-500">
+              Permissions requises: CAN_READ_ANY_DRIVER, CAN_READ_DRIVER ou CAN_READ_OWN_DRIVER
+            </p>
+          </Card>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -133,10 +228,12 @@ export default function DriversPage() {
               Gérez les chauffeurs de votre plateforme
             </p>
           </div>
-          <Button onClick={() => router.push('/drivers/new')}>
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Nouveau chauffeur
-          </Button>
+          {canCreateDriver && (
+            <Button onClick={() => router.push('/drivers/new')}>
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Nouveau chauffeur
+            </Button>
+          )}
         </div>
 
         {error && (
@@ -329,42 +426,48 @@ export default function DriversPage() {
                           >
                             <EyeIcon className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEditDriver(driver.uuid)
-                            }}
-                            title="Modifier"
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleDriverStatus(driver)
-                            }}
-                            title={driver.user.active ? "Désactiver" : "Activer"}
-                          >
-                            <span className="text-sm">
-                              {driver.user.active ? "Désactiver" : "Activer"}
-                            </span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteDriver(driver)
-                            }}
-                            title="Supprimer"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
+                          {canUpdateThisDriver(driver) && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEditDriver(driver.uuid)
+                                }}
+                                title="Modifier"
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleDriverStatus(driver)
+                                }}
+                                title={driver.user.active ? "Désactiver" : "Activer"}
+                              >
+                                <span className="text-sm">
+                                  {driver.user.active ? "Désactiver" : "Activer"}
+                                </span>
+                              </Button>
+                            </>
+                          )}
+                          {canDeleteThisDriver(driver) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteDriver(driver)
+                              }}
+                              title="Supprimer"
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

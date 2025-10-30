@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  ArrowLeftIcon, 
+import {
+  ArrowLeftIcon,
   XMarkIcon,
   StarIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import { DashboardLayout } from '@/components/layout'
@@ -17,7 +18,8 @@ import { evaluationTemplatesService } from '@/services/evaluationTemplates'
 import { driversService } from '@/services/driversService'
 import { partnersService } from '@/services/partnersService'
 import { authService } from '@/services/auth'
-import { ApiEvaluationTemplate, ApiDriver, ApiPartner, AuthUser } from '@/types'
+import { ApiEvaluationTemplate, ApiDriver, ApiPartner, AuthUser, EvaluationPermissions } from '@/types'
+import { usePermissions } from '@/hooks/usePermissions'
 import '@/styles/templates.css'
 
 interface EvaluationScore {
@@ -101,7 +103,11 @@ const ScoreInput = ({
 
 export default function NewEvaluationPage() {
   const router = useRouter()
-  
+  const { hasPermission, hasAllAccess } = usePermissions()
+
+  // Permission check
+  const canCreateEvaluation = hasAllAccess() || hasPermission(EvaluationPermissions.CREATE_EVALUATION)
+
   // États pour les données
   const [drivers, setDrivers] = useState<ApiDriver[]>([])
   const [partners, setPartners] = useState<ApiPartner[]>([])
@@ -236,13 +242,19 @@ export default function NewEvaluationPage() {
   }
 
   const handleSave = async (asDraft = false) => {
+    // Check permission before creating
+    if (!canCreateEvaluation) {
+      setError("Vous n'avez pas la permission de créer une évaluation")
+      return
+    }
+
     if (!asDraft && !validateForm()) {
       return
     }
-    
+
     setIsLoading(true)
     setError(null)
-    
+
     try {
       // Utiliser l'utilisateur connecté comme évaluateur par défaut
       const evaluatorUuid = formData.evaluatorUuid || currentUser?.uuid
@@ -287,6 +299,36 @@ export default function NewEvaluationPage() {
     } else {
       router.back()
     }
+  }
+
+  // Check if user has permission to access this page
+  if (!canCreateEvaluation) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="p-8 max-w-md text-center">
+            <div className="mb-4">
+              <ShieldCheckIcon className="h-16 w-16 text-red-500 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+              Accès non autorisé
+            </h2>
+            <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+              Vous n'avez pas les permissions nécessaires pour créer une évaluation.
+            </p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Permission requise: CAN_CREATE_EVALUATION
+            </p>
+            <div className="mt-6">
+              <Button onClick={() => router.back()}>
+                <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                Retour
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   if (isLoadingData) {

@@ -5,10 +5,15 @@ import { useRouter } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { Card, Button, Input, Badge } from '@/components/ui'
 import { agentsService } from '@/services/agents'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 import type { ApiAgent } from '@/types'
+import { AgentPermissions } from '@/types'
 
 export default function AgentsPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const { hasPermission, hasAnyPermission, hasAllAccess } = usePermissions()
   const [agents, setAgents] = useState<ApiAgent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -19,19 +24,65 @@ export default function AgentsPage() {
   const [totalElements, setTotalElements] = useState(0)
   const pageSize = 10
 
+  // Permission checks
+  const canViewAgents = hasAllAccess() || hasAnyPermission([
+    AgentPermissions.READ_ANY_AGENT,
+    AgentPermissions.READ_AGENT,
+    AgentPermissions.READ_OWN_AGENT
+  ])
+  const canCreateAgent = hasAllAccess() || hasPermission(AgentPermissions.CREATE_AGENT)
+  const canUpdateAgent = hasAllAccess() || hasPermission(AgentPermissions.UPDATE_AGENT)
+  const canUpdateOwnAgent = hasAllAccess() || hasPermission(AgentPermissions.UPDATE_OWN_AGENT)
+  const canDeleteAgent = hasAllAccess() || hasPermission(AgentPermissions.DELETE_AGENT)
+  const canDeleteOwnAgent = hasAllAccess() || hasPermission(AgentPermissions.DELETE_OWN_AGENT)
+
+  // Permission helpers
+  const isOwnAgent = (agent: ApiAgent) => {
+    // Own agent if user is the agent's user OR if user's partner is the agent's partner
+    return user?.uuid === agent.user?.uuid || user?.partnerId === agent.partner?.uuid
+  }
+
+  const canUpdateThisAgent = (agent: ApiAgent) => {
+    if (hasAllAccess()) return true
+    if (canUpdateAgent) return true
+    if (canUpdateOwnAgent && isOwnAgent(agent)) return true
+    return false
+  }
+
+  const canDeleteThisAgent = (agent: ApiAgent) => {
+    if (hasAllAccess()) return true
+    if (canDeleteAgent) return true
+    if (canDeleteOwnAgent && isOwnAgent(agent)) return true
+    return false
+  }
+
   useEffect(() => {
-    loadAgents()
+    if (user) {
+      loadAgents()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, searchTerm, filterStatus])
+  }, [currentPage, searchTerm, filterStatus, user])
 
   const loadAgents = async () => {
     try {
       setLoading(true)
       setError(null)
+
+      // Build SpringFilter for READ_OWN permission
+      let springFilter = searchTerm || undefined
+
+      if (!hasAllAccess() && !hasPermission(AgentPermissions.READ_ANY_AGENT) && !hasPermission(AgentPermissions.READ_AGENT)) {
+        if (hasPermission(AgentPermissions.READ_OWN_AGENT) && user) {
+          // Filter by user's own agents: user.uuid matches agent.user.uuid OR user.partnerId matches agent.partner.uuid
+          const ownFilter = `user.uuid : '${user.uuid}' or partner.uuid : '${user.partnerId}'`
+          springFilter = searchTerm ? `(${searchTerm}) and (${ownFilter})` : ownFilter
+        }
+      }
+
       const response = await agentsService.getAgents({
         page: currentPage,
         size: pageSize,
-        filter: searchTerm || undefined,
+        filter: springFilter,
         status: filterStatus === 'all' ? undefined : filterStatus
       })
       setAgents(response.content)
@@ -49,6 +100,22 @@ export default function AgentsPage() {
     router.push(`/agents/${uuid}`)
   }
 
+  // Show access denied if user doesn't have permission to view agents
+  if (!canViewAgents) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">Accès refusé</h2>
+            <p className="text-red-700 dark:text-red-300">
+              Vous n'avez pas la permission de consulter la liste des agents.
+            </p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -58,7 +125,9 @@ export default function AgentsPage() {
             <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Agents</h1>
             <p className="text-neutral-600 dark:text-neutral-400 mt-2">Gérez les agents de votre plateforme</p>
           </div>
-          <Button onClick={() => router.push('/agents/new')}>Nouveau agent</Button>
+          {canCreateAgent && (
+            <Button onClick={() => router.push('/agents/new')}>Nouveau agent</Button>
+          )}
         </div>
 
         {error && (

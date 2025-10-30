@@ -5,10 +5,15 @@ import { DashboardLayout } from '@/components/layout'
 import { Button, Card, Input, Select, Modal } from '@/components/ui'
 import { usersService } from '@/services/users'
 import { rolesService } from '@/services/roles'
-import { ApiUser, ApiRole, CreateUserRequest, UpdateUserRequest, UserType } from '@/types'
-import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
+import { ApiUser, ApiRole, CreateUserRequest, UpdateUserRequest, UserType, UserPermissions } from '@/types'
+import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function UsersPage() {
+  const { user } = useAuth()
+  const { hasPermission, hasAnyPermission, hasAllAccess } = usePermissions()
+
   const [users, setUsers] = useState<ApiUser[]>([])
   const [roles, setRoles] = useState<ApiRole[]>([])
   const [loading, setLoading] = useState(false)
@@ -18,11 +23,44 @@ export default function UsersPage() {
   const [totalElements, setTotalElements] = useState(0)
   const [searchFilter, setSearchFilter] = useState('')
 
+  // Permission checks
+  const canViewUsers = hasAllAccess() || hasAnyPermission([
+    UserPermissions.READ_ANY_USER,
+    UserPermissions.READ_USER,
+    UserPermissions.READ_OWN_USER
+  ])
+  const canCreateUser = hasAllAccess() || hasPermission(UserPermissions.CREATE_USER)
+  const canUpdateUser = hasAllAccess() || hasPermission(UserPermissions.UPDATE_USER)
+  const canUpdateOwnUser = hasAllAccess() || hasPermission(UserPermissions.UPDATE_OWN_USER)
+  const canDeleteUser = hasAllAccess() || hasPermission(UserPermissions.DELETE_USER)
+  const canDeleteOwnUser = hasAllAccess() || hasPermission(UserPermissions.DELETE_OWN_USER)
+
+  // Helper to check if user is viewing their own profile
+  const isOwnUser = (targetUser: ApiUser) => {
+    return user?.uuid === targetUser.uuid
+  }
+
+  // Helper to check if user can update a specific user
+  const canUpdateThisUser = (targetUser: ApiUser) => {
+    if (hasAllAccess() || canUpdateUser) return true
+    if (canUpdateOwnUser && isOwnUser(targetUser)) return true
+    return false
+  }
+
+  // Helper to check if user can delete a specific user
+  const canDeleteThisUser = (targetUser: ApiUser) => {
+    if (hasAllAccess() || canDeleteUser) return true
+    if (canDeleteOwnUser && isOwnUser(targetUser)) return true
+    return false
+  }
+
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showViewModal, setShowViewModal] = useState(false)
+  const [showRolesModal, setShowRolesModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null)
+  const [selectedRoles, setSelectedRoles] = useState<Array<{ uuid: string; name: string }>>([])
 
   // Form states
   const [formData, setFormData] = useState<CreateUserRequest>({
@@ -76,6 +114,12 @@ export default function UsersPage() {
   }
 
   const handleCreate = async () => {
+    // Check permission before creation
+    if (!canCreateUser) {
+      setError("Vous n'avez pas la permission de créer un utilisateur")
+      return
+    }
+
     try {
       setLoading(true)
       await usersService.createUser(formData)
@@ -91,6 +135,13 @@ export default function UsersPage() {
 
   const handleEdit = async () => {
     if (!selectedUser) return
+
+    // Check permission before update
+    if (!canUpdateThisUser(selectedUser)) {
+      setError("Vous n'avez pas la permission de modifier cet utilisateur")
+      return
+    }
+
     try {
       setLoading(true)
       const updateData: UpdateUserRequest = {
@@ -109,6 +160,28 @@ export default function UsersPage() {
       await loadUsers()
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Erreur lors de la modification')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (user: ApiUser) => {
+    // Check permission before deletion
+    if (!canDeleteThisUser(user)) {
+      setError("Vous n'avez pas la permission de supprimer cet utilisateur")
+      return
+    }
+
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${user.firstname} ${user.lastname} ?`)) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      await usersService.deleteUser(user.uuid)
+      await loadUsers()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Erreur lors de la suppression')
     } finally {
       setLoading(false)
     }
@@ -165,6 +238,73 @@ export default function UsersPage() {
     setShowViewModal(true)
   }
 
+  const openRolesModal = (user: ApiUser) => {
+    setSelectedUser(user)
+    // Préparer les rôles sélectionnés avec l'UUID et le nom
+    const userRoles = user.roles.map(role => ({
+      uuid: role.uuid,
+      name: role.name
+    }))
+    setSelectedRoles(userRoles)
+    setShowRolesModal(true)
+  }
+
+  const handleRoleToggle = (role: ApiRole) => {
+    const roleUuid = role.uuid
+    const isSelected = selectedRoles.some(r => r.uuid === roleUuid)
+
+    if (isSelected) {
+      // Retirer le rôle
+      setSelectedRoles(selectedRoles.filter(r => r.uuid !== roleUuid))
+    } else {
+      // Ajouter le rôle
+      setSelectedRoles([...selectedRoles, { uuid: roleUuid, name: role.name }])
+    }
+  }
+
+  const handleUpdateRoles = async () => {
+    if (!selectedUser) return
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Préparer le payload selon le format API
+      await usersService.updateUser(selectedUser.uuid, {
+        roles: selectedRoles
+      })
+
+      setShowRolesModal(false)
+      setSelectedRoles([])
+      await loadUsers()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Erreur lors de la mise à jour des rôles')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Check if user has permission to view this page
+  if (!canViewUsers) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="p-8 max-w-md text-center">
+            <div className="mb-4">
+              <ShieldCheckIcon className="h-16 w-16 text-red-500 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-2">Accès non autorisé</h2>
+            <p className="text-neutral-600 mb-4">
+              Vous n'avez pas les permissions nécessaires pour accéder à la gestion des utilisateurs.
+            </p>
+            <p className="text-sm text-neutral-500">
+              Permissions requises: CAN_READ_ANY_USER, CAN_READ_USER ou CAN_READ_OWN_USER
+            </p>
+          </Card>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -174,10 +314,12 @@ export default function UsersPage() {
             <h1 className="text-2xl font-bold text-neutral-900">Gestion des Utilisateurs</h1>
             <p className="text-neutral-600">Gérez les utilisateurs de la plateforme</p>
           </div>
-          <Button onClick={openCreateModal} className="flex items-center space-x-2">
-            <PlusIcon className="h-5 w-5" />
-            <span>Nouveau Utilisateur</span>
-          </Button>
+          {canCreateUser && (
+            <Button onClick={openCreateModal} className="flex items-center space-x-2">
+              <PlusIcon className="h-5 w-5" />
+              <span>Nouveau Utilisateur</span>
+            </Button>
+          )}
         </div>
 
         {/* Filters */}
@@ -239,17 +381,28 @@ export default function UsersPage() {
                         <td className="py-3 px-4 text-neutral-600">{user.email}</td>
                         <td className="py-3 px-4 text-neutral-600">{user.phone}</td>
                         <td className="py-3 px-4">
-                          <div className="flex flex-wrap gap-1">
-                            {user.roles.map((role) => (
-                              <span
-                                key={role.uuid}
-                                className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap gap-1">
+                              {user.roles.map((role) => (
+                                <span
+                                  key={role.uuid}
+                                  className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                                >
+                                  {role.name}
+                                </span>
+                              ))}
+                              {user.roles.length === 0 && (
+                                <span className="text-sm text-red-500 font-medium">Aucun rôle</span>
+                              )}
+                            </div>
+                            {canUpdateThisUser(user) && (
+                              <button
+                                onClick={() => openRolesModal(user)}
+                                className="text-blue-600 hover:text-blue-800 ml-2"
+                                title="Gérer les rôles"
                               >
-                                {role.name}
-                              </span>
-                            ))}
-                            {user.roles.length === 0 && (
-                              <span className="text-sm text-neutral-400">Aucun rôle</span>
+                                <ShieldCheckIcon className="h-4 w-4" />
+                              </button>
                             )}
                           </div>
                         </td>
@@ -268,16 +421,30 @@ export default function UsersPage() {
                               variant="secondary"
                               size="sm"
                               onClick={() => openViewModal(user)}
+                              title="Voir les détails"
                             >
                               <EyeIcon className="h-4 w-4" />
                             </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => openEditModal(user)}
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </Button>
+                            {canUpdateThisUser(user) && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => openEditModal(user)}
+                                title="Modifier"
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDeleteThisUser(user) && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => handleDelete(user)}
+                                title="Supprimer"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -573,6 +740,96 @@ export default function UsersPage() {
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Dernière connexion</label>
                   <p className="text-neutral-900">{selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleDateString('fr-FR') : 'Jamais'}</p>
                 </div>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Roles Management Modal */}
+        <Modal
+          isOpen={showRolesModal}
+          onClose={() => setShowRolesModal(false)}
+          title="Gérer les rôles"
+        >
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-900">
+                  <span className="font-semibold">Utilisateur:</span> {selectedUser.firstname} {selectedUser.lastname}
+                </p>
+                <p className="text-sm text-blue-700 mt-1">
+                  Sélectionnez les rôles à assigner à cet utilisateur
+                </p>
+              </div>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {roles.map((role) => {
+                  const isSelected = selectedRoles.some(r => r.uuid === role.uuid)
+
+                  return (
+                    <div
+                      key={role.uuid}
+                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-neutral-200 hover:border-neutral-300'
+                      }`}
+                      onClick={() => handleRoleToggle(role)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleRoleToggle(role)}
+                            className="mt-1"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div>
+                            <h4 className="font-medium text-neutral-900">{role.name}</h4>
+                            <p className="text-sm text-neutral-600 mt-1">
+                              {role.permissions.length} permission(s)
+                            </p>
+                            {role.permissions.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {role.permissions.slice(0, 3).map((perm) => (
+                                  <span
+                                    key={perm.uuid}
+                                    className="px-2 py-0.5 text-xs bg-neutral-100 text-neutral-600 rounded"
+                                  >
+                                    {perm.name}
+                                  </span>
+                                ))}
+                                {role.permissions.length > 3 && (
+                                  <span className="px-2 py-0.5 text-xs text-neutral-500">
+                                    +{role.permissions.length - 3} autres
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {selectedRoles.length === 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ Attention: Cet utilisateur n'aura aucun rôle et ne pourra accéder à aucune fonctionnalité.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <Button variant="secondary" onClick={() => setShowRolesModal(false)}>
+                  Annuler
+                </Button>
+                <Button onClick={handleUpdateRoles} disabled={loading}>
+                  {loading ? 'Mise à jour...' : 'Enregistrer'}
+                </Button>
               </div>
             </div>
           )}

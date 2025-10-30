@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { Card, Button, Input, Select } from '@/components/ui'
 import { agentsService } from '@/services/agents'
+import { usePermissions } from '@/hooks/usePermissions'
 import type { CreateAgentRequest } from '@/types'
+import { AgentPermissions } from '@/types'
 
 export default function NewAgentPage() {
   const router = useRouter()
+  const { hasPermission, hasAllAccess } = usePermissions()
   const [form, setForm] = useState<CreateAgentRequest>({
     phone: '',
     lastname: '',
@@ -27,6 +30,9 @@ export default function NewAgentPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Permission check
+  const canCreateAgent = hasAllAccess() || hasPermission(AgentPermissions.CREATE_AGENT)
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
@@ -34,6 +40,13 @@ export default function NewAgentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Check permission before creating
+    if (!canCreateAgent) {
+      alert("Vous n'avez pas la permission de créer un agent")
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
@@ -45,6 +58,25 @@ export default function NewAgentPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show access denied if user doesn't have permission
+  if (!canCreateAgent) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">Accès refusé</h2>
+            <p className="text-red-700 dark:text-red-300">
+              Vous n'avez pas la permission de créer un agent.
+            </p>
+            <div className="mt-4">
+              <Button variant="outline" onClick={() => router.push('/agents')}>Retour aux agents</Button>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (

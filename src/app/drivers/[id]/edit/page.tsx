@@ -2,25 +2,28 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { 
+import {
   ArrowLeftIcon,
   UserIcon,
   TruckIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { DashboardLayout } from '@/components/layout'
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  Button, 
-  Input, 
-  Select, 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Button,
+  Input,
+  Select,
   Textarea
 } from '@/components/ui'
-import { ApiDriver, UpdateDriverRequest, UpdateVehicleInfoRequest } from '@/types'
+import { ApiDriver, UpdateDriverRequest, UpdateVehicleInfoRequest, DriverPermissions } from '@/types'
 import { driversService } from '@/services/drivers'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface DriverFormData {
   firstname: string
@@ -70,6 +73,10 @@ const vehicleYearOptions = [
 export default function EditDriverPage() {
   const router = useRouter()
   const params = useParams()
+  const { user } = useAuth()
+  const { hasPermission, hasAllAccess } = usePermissions()
+
+  const [driver, setDriver] = useState<ApiDriver | null>(null)
   const [formData, setFormData] = useState<DriverFormData>({
     firstname: '',
     lastname: '',
@@ -95,6 +102,23 @@ export default function EditDriverPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Permission checks
+  const canUpdateDriver = hasAllAccess() || hasPermission(DriverPermissions.UPDATE_DRIVER)
+  const canUpdateOwnDriver = hasAllAccess() || hasPermission(DriverPermissions.UPDATE_OWN_DRIVER)
+
+  // Helper to check if driver belongs to current user
+  const isOwnDriver = (targetDriver: ApiDriver) => {
+    return user?.uuid === targetDriver.user?.uuid
+  }
+
+  // Helper to check if user can update this specific driver
+  const canUpdateThisDriver = (targetDriver: ApiDriver | null) => {
+    if (!targetDriver) return false
+    if (hasAllAccess() || canUpdateDriver) return true
+    if (canUpdateOwnDriver && isOwnDriver(targetDriver)) return true
+    return false
+  }
+
   useEffect(() => {
     const loadDriver = async () => {
       if (!params.id || typeof params.id !== 'string') return
@@ -102,25 +126,26 @@ export default function EditDriverPage() {
       setIsLoading(true)
       setError(null)
       try {
-        const driver = await driversService.getDriver(params.id)
+        const fetchedDriver = await driversService.getDriver(params.id)
+        setDriver(fetchedDriver)
         setFormData({
-          firstname: driver.user.firstname,
-          lastname: driver.user.lastname,
-          email: driver.user.email,
-          phone: driver.user.phone,
-          address: driver.user.address || '',
-          city: driver.user.city || '',
-          country: driver.user.country || '',
-          dob: driver.user.dob,
-          licenseNumber: driver.licenseNumber || driver.licenseID,
-          vehicleType: driver.vehicleType || '',
-          vehicleMake: driver.vehicleInfo?.make || '',
-          vehicleModel: driver.vehicleInfo?.model || '',
-          vehicleYear: driver.vehicleInfo?.year?.toString() || '',
-          vehicleColor: driver.vehicleInfo?.color || '',
-          plateNumber: driver.vehicleInfo?.plateNumber || '',
-          partnerId: driver.partnerId || '',
-          active: driver.user.active
+          firstname: fetchedDriver.user.firstname,
+          lastname: fetchedDriver.user.lastname,
+          email: fetchedDriver.user.email,
+          phone: fetchedDriver.user.phone,
+          address: fetchedDriver.user.address || '',
+          city: fetchedDriver.user.city || '',
+          country: fetchedDriver.user.country || '',
+          dob: fetchedDriver.user.dob,
+          licenseNumber: fetchedDriver.licenseNumber || fetchedDriver.licenseID,
+          vehicleType: fetchedDriver.vehicleType || '',
+          vehicleMake: fetchedDriver.vehicleInfo?.make || '',
+          vehicleModel: fetchedDriver.vehicleInfo?.model || '',
+          vehicleYear: fetchedDriver.vehicleInfo?.year?.toString() || '',
+          vehicleColor: fetchedDriver.vehicleInfo?.color || '',
+          plateNumber: fetchedDriver.vehicleInfo?.plateNumber || '',
+          partnerId: fetchedDriver.partnerId || '',
+          active: fetchedDriver.user.active
         })
       } catch (error) {
         console.error('Erreur lors du chargement du chauffeur:', error)
@@ -155,6 +180,12 @@ export default function EditDriverPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Check permission before updating
+    if (!canUpdateThisDriver(driver)) {
+      setError("Vous n'avez pas la permission de modifier ce chauffeur")
+      return
+    }
 
     if (!validateForm() || !params.id || typeof params.id !== 'string') {
       return
@@ -239,6 +270,36 @@ export default function EditDriverPage() {
               Retour aux chauffeurs
             </Button>
           </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Check if user has permission to edit this driver
+  if (driver && !canUpdateThisDriver(driver)) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="p-8 max-w-md text-center">
+            <div className="mb-4">
+              <ShieldCheckIcon className="h-16 w-16 text-red-500 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+              Accès non autorisé
+            </h2>
+            <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+              Vous n'avez pas les permissions nécessaires pour modifier ce chauffeur.
+            </p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Permissions requises: CAN_UPDATE_DRIVER ou CAN_UPDATE_OWN_DRIVER
+            </p>
+            <div className="mt-6">
+              <Button onClick={() => router.push('/drivers')}>
+                <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                Retour aux chauffeurs
+              </Button>
+            </div>
+          </Card>
         </div>
       </DashboardLayout>
     )
