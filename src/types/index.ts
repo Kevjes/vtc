@@ -689,3 +689,49 @@ export interface TemplateStats {
   lastUsed?: string
   averageScore?: number
 }
+
+// Agent types
+export interface ApiAgent {
+  uuid: string
+  version: number
+  code: string
+  slug?: string | null
+  createdBy?: number
+  createdDate: string
+  lastModifiedBy?: number
+  lastModifiedDate: string
+  deleted?: boolean | null
+  isDeletable?: boolean | null
+  user: ApiUser
+  partner: ApiPartner
+  position: string
+  status: string
+}
+
+export interface CreateAgentRequest {
+  // User informations
+  phone: string
+  lastname: string
+  firstname: string
+  dob: string
+  email: string
+  address?: string
+  city?: string
+  country?: string
+  countryISO?: string
+  countryCode?: string
+  // Agent informations
+  partner: { uuid: string }
+  position: string
+  status: string
+}
+
+// Optional: query params for fetching agents
+export interface GetAgentsParams {
+  page?: number
+  size?: number
+  filter?: string
+  status?: string
+  partnerUuid?: string
+  active?: boolean
+}
