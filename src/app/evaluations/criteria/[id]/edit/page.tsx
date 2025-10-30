@@ -24,6 +24,7 @@ import { evaluationCriteriaService } from '@/services/evaluationCriteria'
 export default function EditEvaluationCriteriaPage() {
   const router = useRouter()
   const params = useParams()
+  const itemId = typeof params?.id === 'string' ? params.id : ''
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -37,12 +38,12 @@ export default function EditEvaluationCriteriaPage() {
 
   useEffect(() => {
     const loadCriterion = async () => {
-      if (!params.id || typeof params.id !== 'string') return
+      if (!itemId || typeof itemId !== 'string') return
 
       setIsLoading(true)
       setError(null)
       try {
-        const criterion = await evaluationCriteriaService.getCriterion(params.id)
+        const criterion = await evaluationCriteriaService.getCriterion(itemId)
         setFormData({
           name: criterion.name,
           description: criterion.description ?? '',
@@ -57,7 +58,7 @@ export default function EditEvaluationCriteriaPage() {
     }
 
     loadCriterion()
-  }, [params.id])
+  }, [itemId])
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof typeof formData, string>> = {}
@@ -72,7 +73,7 @@ export default function EditEvaluationCriteriaPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!validateForm() || !params.id || typeof params.id !== 'string') {
+    if (!validateForm() || !itemId || typeof itemId !== 'string') {
       return
     }
 
@@ -86,8 +87,8 @@ export default function EditEvaluationCriteriaPage() {
         active: formData.active
       }
 
-      await evaluationCriteriaService.updateCriterion(params.id, updateData)
-      router.push(`/evaluations/criteria/${params.id}?success=criterion-updated`)
+      await evaluationCriteriaService.updateCriterion(itemId, updateData)
+      router.push(`/evaluations/criteria/${itemId}?success=criterion-updated`)
     } catch (error) {
       console.error('Erreur lors de la modification du critère:', error)
       setError(error instanceof Error ? error.message : 'Erreur lors de la modification')

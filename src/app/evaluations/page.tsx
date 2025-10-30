@@ -92,7 +92,7 @@ export default function EvaluationsPage() {
   // Helper to check if evaluation belongs to current user
   const isOwnEvaluation = (evaluation: ApiEvaluation) => {
     // Une évaluation appartient à l'utilisateur si c'est lui le chauffeur évalué
-    return user?.uuid === evaluation.driver?.user?.uuid
+    return user?.uuid === evaluation.driver?.uuid
   }
 
   // Helper to check if user can update a specific evaluation

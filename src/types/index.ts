@@ -743,20 +743,6 @@ export interface GetAgentsParams {
   active?: boolean
 }
 
-// Permission guard names for Agents
-export enum AgentPermissions {
-  CREATE_AGENT = 'CAN_CREATE_AGENT',
-  READ_ANY_AGENT = 'CAN_READ_ANY_AGENT',
-  READ_AGENT = 'CAN_READ_AGENT',
-  READ_OWN_AGENT = 'CAN_READ_OWN_AGENT',
-  UPDATE_AGENT = 'CAN_UPDATE_AGENT',
-  UPDATE_OWN_AGENT = 'CAN_UPDATE_OWN_AGENT',
-  DELETE_AGENT = 'CAN_DELETE_AGENT',
-  DELETE_OWN_AGENT = 'CAN_DELETE_OWN_AGENT',
-  RESTORE_AGENT = 'CAN_RESTORE_AGENT',
-  RESTORE_OWN_AGENT = 'CAN_RESTORE_OWN_AGENT'
-}
-
 // Permission guard names for Users
 export enum UserPermissions {
   VIEW_MENU_USER = 'CAN_VIEW_MENU_USER',

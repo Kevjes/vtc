@@ -13,7 +13,8 @@ import '@/styles/templates.css'
 export default function EditEvaluationTemplatePage() {
   const router = useRouter()
   const params = useParams()
-  const uuid = params.uuid as string
+  const itemId = typeof params?.uuid === 'string' ? params.uuid : ''
+  const uuid = itemId as string
 
   const [template, setTemplate] = useState<ApiEvaluationTemplate | null>(null)
   const [isLoading, setIsLoading] = useState(false)

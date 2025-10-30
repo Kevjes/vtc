@@ -19,7 +19,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const redirectTo = searchParams.get('redirect') || '/'
+      const redirectTo = searchParams?.get('redirect') || '/'
       router.push(redirectTo)
     }
   }, [isAuthenticated, router, searchParams])
@@ -46,7 +46,7 @@ export default function LoginPage() {
 
     try {
       await login(formData)
-      const redirectTo = searchParams.get('redirect') || '/'
+      const redirectTo = searchParams?.get('redirect') || '/'
       router.push(redirectTo)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Erreur de connexion')

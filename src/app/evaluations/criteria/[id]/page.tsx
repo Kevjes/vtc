@@ -15,13 +15,14 @@ import { DashboardLayout } from '@/components/layout';
 import { Modal } from '@/components/ui/Modal';
 
 export default function EvaluationCriteriaDetailPage() {
-  const params = useParams();
+  const params = useParams()
+  const itemId = typeof params?.id === 'string' ? params.id : '';
   const router = useRouter();
   const [criterion, setCriterion] = useState<ApiEvaluationCriteria | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const criterionId = params.id as string;
+  const criterionId = itemId as string;
 
   useEffect(() => {
     fetchCriterion();

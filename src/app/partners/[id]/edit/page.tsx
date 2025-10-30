@@ -107,6 +107,7 @@ const mockPartner = {
 export default function EditPartnerPage() {
   const router = useRouter()
   const params = useParams()
+  const partnerId = typeof params?.id === 'string' ? params.id : ''
   const { user } = useAuth()
   const { hasPermission, hasAllAccess } = usePermissions()
 
@@ -165,7 +166,7 @@ export default function EditPartnerPage() {
     }
 
     loadPartner()
-  }, [params.id])
+  }, [partnerId])
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof PartnerFormData, string>> = {}
@@ -230,7 +231,7 @@ export default function EditPartnerPage() {
       await new Promise(resolve => setTimeout(resolve, 2000))
 
       // Succès - rediriger vers le profil du partenaire
-      router.push(`/partners/${params.id}?success=partner-updated`)
+      router.push(`/partners/${partnerId}?success=partner-updated`)
     } catch (error) {
       console.error('Erreur lors de la modification du partenaire:', error)
     } finally {

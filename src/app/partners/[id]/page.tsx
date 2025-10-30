@@ -165,6 +165,7 @@ const getCountryLabel = (code: string) => {
 export default function PartnerDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const partnerId = typeof params?.id === 'string' ? params.id : ''
   const [partner, setPartner] = useState<PartnerDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -183,7 +184,7 @@ export default function PartnerDetailPage() {
     }
 
     loadPartner()
-  }, [params.id])
+  }, [partnerId])
 
   if (isLoading) {
     return (
@@ -241,7 +242,7 @@ export default function PartnerDetailPage() {
           <div className="flex items-center space-x-3">
             <Button 
               variant="outline"
-              onClick={() => router.push(`/partners/${params.id}/edit`)}
+              onClick={() => router.push(`/partners/${partnerId}/edit`)}
             >
               <PencilIcon className="h-4 w-4 mr-2" />
               Modifier
@@ -582,7 +583,7 @@ export default function PartnerDetailPage() {
               Ajouter un chauffeur
             </Button>
             <Button
-              onClick={() => router.push(`/partners/${params.id}/edit`)}
+              onClick={() => router.push(`/partners/${partnerId}/edit`)}
             >
               <PencilIcon className="h-4 w-4 mr-2" />
               Modifier le partenaire

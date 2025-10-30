@@ -63,18 +63,19 @@ const getRatingStars = (rating: number) => {
 export default function DriverDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const driverId = typeof params?.id === 'string' ? params.id : ''
   const [driver, setDriver] = useState<ApiDriver | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadDriver = async () => {
-      if (!params.id || typeof params.id !== 'string') return
+      if (!driverId) return
 
       setIsLoading(true)
       setError(null)
       try {
-        const driverData = await driversService.getDriver(params.id)
+        const driverData = await driversService.getDriver(driverId)
         setDriver(driverData)
       } catch (error) {
         console.error('Erreur lors du chargement du chauffeur:', error)
@@ -85,7 +86,7 @@ export default function DriverDetailPage() {
     }
 
     loadDriver()
-  }, [params.id])
+  }, [driverId])
 
   if (isLoading) {
     return (
@@ -161,7 +162,7 @@ export default function DriverDetailPage() {
           <div className="flex items-center space-x-3">
             <Button 
               variant="outline"
-              onClick={() => router.push(`/drivers/${params.id}/edit`)}
+              onClick={() => router.push(`/drivers/${driverId}/edit`)}
             >
               <PencilIcon className="h-4 w-4 mr-2" />
               Modifier
@@ -394,7 +395,7 @@ export default function DriverDetailPage() {
               Nouvelle évaluation
             </Button>
             <Button
-              onClick={() => router.push(`/drivers/${params.id}/edit`)}
+              onClick={() => router.push(`/drivers/${driverId}/edit`)}
             >
               <PencilIcon className="h-4 w-4 mr-2" />
               Modifier le profil

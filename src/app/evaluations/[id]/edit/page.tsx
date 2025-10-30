@@ -123,7 +123,8 @@ export default function EditEvaluationPage() {
     // Helper to check if evaluation belongs to current user
     const isOwnEvaluation = (ev: ApiEvaluation | null) => {
       if (!ev) return false
-      return user?.uuid === ev.driver?.user?.uuid
+      // Check if user is the driver of this evaluation
+      return user?.uuid === ev.driver?.uuid
     }
 
     // Helper to check if user can update this specific evaluation

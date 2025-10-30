@@ -73,6 +73,7 @@ const vehicleYearOptions = [
 export default function EditDriverPage() {
   const router = useRouter()
   const params = useParams()
+  const driverId = typeof params?.id === 'string' ? params.id : ''
   const { user } = useAuth()
   const { hasPermission, hasAllAccess } = usePermissions()
 
@@ -121,12 +122,12 @@ export default function EditDriverPage() {
 
   useEffect(() => {
     const loadDriver = async () => {
-      if (!params?.id || typeof params.id !== 'string') return
+      if (!driverId) return
 
       setIsLoading(true)
       setError(null)
       try {
-        const fetchedDriver = await driversService.getDriver(params.id)
+        const fetchedDriver = await driversService.getDriver(driverId)
         setDriver(fetchedDriver)
         setFormData({
           firstname: fetchedDriver.user.firstname,
@@ -156,7 +157,7 @@ export default function EditDriverPage() {
     }
 
     loadDriver()
-  }, [params?.id])
+  }, [driverId])
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof DriverFormData, string>> = {}
@@ -187,7 +188,7 @@ export default function EditDriverPage() {
       return
     }
 
-    if (!validateForm() || !params?.id || typeof params.id !== 'string') {
+    if (!validateForm() || !driverId) {
       return
     }
 
@@ -223,8 +224,8 @@ export default function EditDriverPage() {
         updateData.partnerId = formData.partnerId
       }
 
-      await driversService.updateDriver(params.id, updateData)
-      router.push(`/drivers/${params.id}?success=driver-updated`)
+      await driversService.updateDriver(driverId, updateData)
+      router.push(`/drivers/${driverId}?success=driver-updated`)
     } catch (error) {
       console.error('Erreur lors de la modification du chauffeur:', error)
       setError(error instanceof Error ? error.message : 'Erreur lors de la modification')
