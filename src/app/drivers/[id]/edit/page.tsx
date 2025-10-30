@@ -121,7 +121,7 @@ export default function EditDriverPage() {
 
   useEffect(() => {
     const loadDriver = async () => {
-      if (!params.id || typeof params.id !== 'string') return
+      if (!params?.id || typeof params.id !== 'string') return
 
       setIsLoading(true)
       setError(null)
@@ -156,7 +156,7 @@ export default function EditDriverPage() {
     }
 
     loadDriver()
-  }, [params.id])
+  }, [params?.id])
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof DriverFormData, string>> = {}
@@ -187,7 +187,7 @@ export default function EditDriverPage() {
       return
     }
 
-    if (!validateForm() || !params.id || typeof params.id !== 'string') {
+    if (!validateForm() || !params?.id || typeof params.id !== 'string') {
       return
     }
 

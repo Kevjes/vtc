@@ -176,6 +176,7 @@ export interface AuthUser {
   country?: string
   countryCode?: string
   dob?: string
+  partnerId?: string // Partner UUID for users associated with a partner
 }
 
 export interface Role {
