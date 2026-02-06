@@ -2,6 +2,7 @@ import {
   ApiResponse,
   PaginatedResponse,
   ApiPartner,
+  ApiDriver,
   CreatePartnerRequest,
   UpdatePartnerRequest
 } from '@/types'
@@ -182,6 +183,33 @@ class PartnersService {
 
   async updatePartnerStatus(uuid: string, status: string): Promise<ApiPartner> {
     return this.updatePartner(uuid, { status: status as any })
+  }
+
+  async getPartnerDrivers(uuid: string): Promise<ApiDriver[]> {
+    try {
+      console.log('🔍 [PartnersService] Récupération des chauffeurs du partenaire...', uuid)
+
+      const response = await authService.authenticatedFetch(`${this.baseURL}/partners/${uuid}/drivers`, {
+        method: 'GET'
+      })
+
+      const data: ApiResponse<ApiDriver[]> = await response.json()
+      console.log('🔍 [PartnersService] Réponse API partner drivers:', data)
+
+      if (!data.valid || data.status !== 200) {
+        console.log('❌ [PartnersService] Erreur API partner drivers:', data.message)
+        throw new Error(data.message || 'Erreur lors de la récupération des chauffeurs du partenaire')
+      }
+
+      console.log('✅ [PartnersService] Chauffeurs du partenaire récupérés:', data.data.length)
+      return data.data
+    } catch (error) {
+      console.error('❌ [PartnersService] Erreur getPartnerDrivers:', error)
+      if (error instanceof Error) {
+        throw error
+      }
+      throw new Error('Erreur de connexion au serveur')
+    }
   }
 }
 
