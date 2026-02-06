@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build: .
+    container_name: vtc-dashboard
+    ports:
+      - "3100:3000"
+    env_file:
+      - .env
+    restart: always
