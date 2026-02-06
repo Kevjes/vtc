@@ -35,7 +35,7 @@ class UsersService {
       const queryParams = new URLSearchParams()
       if (params?.page !== undefined) queryParams.append('page', params.page.toString())
       if (params?.size !== undefined) queryParams.append('size', params.size.toString())
-      if (params?.filter) queryParams.append('filter', params.filter)
+      if (params?.filter) queryParams.append('specs', params.filter)
 
       const url = `${this.baseURL}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
 

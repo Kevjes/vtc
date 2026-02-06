@@ -28,7 +28,7 @@ class PartnersService {
       const queryParams = new URLSearchParams()
       if (params?.page !== undefined) queryParams.append('page', params.page.toString())
       if (params?.size !== undefined) queryParams.append('size', params.size.toString())
-      if (params?.filter) queryParams.append('filter', params.filter)
+      if (params?.filter) queryParams.append('specs', params.filter)
       if (params?.status) queryParams.append('status', params.status)
       if (params?.active !== undefined) queryParams.append('active', params.active.toString())
 

@@ -88,11 +88,15 @@ export default function UsersPage() {
   const loadUsers = async () => {
     try {
       setLoading(true)
-      setError(null)
+      let springFilter = ''
+      if (searchFilter) {
+        springFilter = `(firstname~~'*${searchFilter}*' or lastname~~'*${searchFilter}*' or email~~'*${searchFilter}*' or phone~~'*${searchFilter}*' or username~~'*${searchFilter}*')`
+      }
+
       const response = await usersService.getUsers({
         page: currentPage,
         size: 10,
-        filter: searchFilter || undefined
+        filter: springFilter || undefined
       })
       setUsers(response.content)
       setTotalPages(response.totalPages)
@@ -407,11 +411,10 @@ export default function UsersPage() {
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <span className={`px-2 py-1 text-xs rounded ${
-                            user.active
+                          <span className={`px-2 py-1 text-xs rounded ${user.active
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
-                          }`}>
+                            }`}>
                             {user.active ? 'Actif' : 'Inactif'}
                           </span>
                         </td>
@@ -674,11 +677,10 @@ export default function UsersPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Statut</label>
-                  <span className={`px-2 py-1 text-xs rounded ${
-                    selectedUser.active
+                  <span className={`px-2 py-1 text-xs rounded ${selectedUser.active
                       ? 'bg-green-100 text-green-800'
                       : 'bg-red-100 text-red-800'
-                  }`}>
+                    }`}>
                     {selectedUser.active ? 'Actif' : 'Inactif'}
                   </span>
                 </div>
@@ -769,11 +771,10 @@ export default function UsersPage() {
                   return (
                     <div
                       key={role.uuid}
-                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                        isSelected
+                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${isSelected
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-neutral-200 hover:border-neutral-300'
-                      }`}
+                        }`}
                       onClick={() => handleRoleToggle(role)}
                     >
                       <div className="flex items-start justify-between">

@@ -90,7 +90,7 @@ export interface UpdateEvaluationRequest {
 class EvaluationsService {
   private baseURL = API_BASE_URL
 
-  async getEvaluations(params?: { 
+  async getEvaluations(params?: {
     page?: number
     size?: number
     filter?: string
@@ -102,7 +102,7 @@ class EvaluationsService {
       const queryParams = new URLSearchParams()
       if (params?.page !== undefined) queryParams.append('page', params.page.toString())
       if (params?.size !== undefined) queryParams.append('size', params.size.toString())
-      if (params?.filter) queryParams.append('filter', params.filter)
+      if (params?.filter) queryParams.append('specs', params.filter)
       if (params?.status) queryParams.append('status', params.status)
 
       const url = `${this.baseURL}/evaluations${queryParams.toString() ? `?${queryParams.toString()}` : ''}`

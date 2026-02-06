@@ -35,9 +35,8 @@ const getRatingStars = (rating: number) => {
   return Array.from({ length: 5 }, (_, i) => (
     <StarIcon
       key={i}
-      className={`h-4 w-4 ${
-        i < Math.floor(rating) ? 'text-yellow-500' : 'text-neutral-300 dark:text-neutral-600'
-      }`}
+      className={`h-4 w-4 ${i < Math.floor(rating) ? 'text-yellow-500' : 'text-neutral-300 dark:text-neutral-600'
+        }`}
     />
   ))
 }
@@ -146,7 +145,7 @@ export default function EvaluationsPage() {
       }
 
       if (filters.status !== 'all') {
-        filterParts.push(`status='${filters.status}'`)
+        filterParts.push(`status : '${filters.status}'`)
       }
 
       if (filters.period !== 'all') {
@@ -170,20 +169,20 @@ export default function EvaluationsPage() {
             startDate = new Date(0)
         }
 
-        filterParts.push(`evaluationDate >= '${startDate.toISOString().split('T')[0]}'`)
+        filterParts.push(`evaluationDate > '${startDate.toISOString().split('T')[0]}'`)
       }
 
       if (filters.search) {
-        filterParts.push(`(driver.user.firstname LIKE '%${filters.search}%' OR driver.user.lastname LIKE '%${filters.search}%' OR partner.name LIKE '%${filters.search}%')`)
+        filterParts.push(`(driver.user.firstname ~~ '*${filters.search}*' or driver.user.lastname ~~ '*${filters.search}*' or partner.name ~~ '*${filters.search}*')`)
       }
 
       if (filterParts.length > 0) {
-        params.filter = filterParts.join(' AND ')
+        params.filter = filterParts.join(' and ')
       }
 
       const data = await evaluationsService.getEvaluations(params)
       setEvaluations(data)
-      
+
       // Calculer les statistiques
       if (data.content.length > 0) {
         const calculatedStats = evaluationStatsService.calculateStats(data.content)
@@ -311,7 +310,7 @@ export default function EvaluationsPage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
@@ -408,7 +407,7 @@ export default function EvaluationsPage() {
                   ]}
                   className="w-36 h-9 text-sm"
                 />
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => setShowFilters(!showFilters)}
                   size="sm"
@@ -418,7 +417,7 @@ export default function EvaluationsPage() {
                 </Button>
               </div>
             </div>
-            
+
             {showFilters && stats && (
               <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -480,14 +479,14 @@ export default function EvaluationsPage() {
             <CardContent>
               <div className="space-y-3">
                 {evaluations.content.map((evaluation) => (
-                  <div 
-                    key={evaluation.uuid} 
+                  <div
+                    key={evaluation.uuid}
                     className="border border-neutral-200 dark:border-neutral-800 rounded-lg p-4 hover:bg-neutral-50 dark:hover:bg-neutral-900/50 cursor-pointer transition-colors"
                     onClick={() => handleViewEvaluation(evaluation.uuid)}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-3">
-                        <Avatar 
+                        <Avatar
                           fallback={`${evaluation.driver.user.firstname[0]}${evaluation.driver.user.lastname[0]}`}
                           size="md"
                         />
@@ -557,8 +556,8 @@ export default function EvaluationsPage() {
                         </span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -587,12 +586,12 @@ export default function EvaluationsPage() {
                     </div>
                   </div>
                 ))}
-                
+
                 {evaluations.content.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-neutral-500 dark:text-neutral-400">
                       {filters.search || filters.status !== 'all' || filters.period !== 'all'
-                        ? 'Aucune évaluation trouvée avec ces critères' 
+                        ? 'Aucune évaluation trouvée avec ces critères'
                         : 'Aucune évaluation trouvée'
                       }
                     </p>
@@ -607,10 +606,10 @@ export default function EvaluationsPage() {
                     {evaluations.numberOfElements} évaluation{evaluations.numberOfElements > 1 ? 's' : ''} sur {evaluations.totalElements}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      disabled={page <= 0} 
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page <= 0}
                       onClick={() => setPage(p => Math.max(0, p - 1))}
                     >
                       Précédent
@@ -618,10 +617,10 @@ export default function EvaluationsPage() {
                     <span className="px-3 py-1 text-sm text-neutral-600 dark:text-neutral-400">
                       {page + 1} / {evaluations.totalPages}
                     </span>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      disabled={page + 1 >= evaluations.totalPages} 
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page + 1 >= evaluations.totalPages}
                       onClick={() => setPage(p => p + 1)}
                     >
                       Suivant

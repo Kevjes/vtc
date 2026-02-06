@@ -6,7 +6,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3
 class EvaluationTemplatesService {
   private baseURL = API_BASE_URL
 
-  async getTemplates(params?: { 
+  async getTemplates(params?: {
     page?: number
     size?: number
     filter?: string
@@ -18,7 +18,7 @@ class EvaluationTemplatesService {
       const queryParams = new URLSearchParams()
       if (params?.page !== undefined) queryParams.append('page', params.page.toString())
       if (params?.size !== undefined) queryParams.append('size', params.size.toString())
-      if (params?.filter) queryParams.append('filter', params.filter)
+      if (params?.filter) queryParams.append('specs', params.filter)
       if (params?.active !== undefined) queryParams.append('active', params.active.toString())
 
       const url = `${this.baseURL}/evaluation-templates${queryParams.toString() ? `?${queryParams.toString()}` : ''}`

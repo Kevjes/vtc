@@ -13,7 +13,7 @@ class EvaluationCriteriaService {
       const queryParams = new URLSearchParams()
       if (params?.page !== undefined) queryParams.append('page', params.page.toString())
       if (params?.size !== undefined) queryParams.append('size', params.size.toString())
-      if (params?.filter) queryParams.append('filter', params.filter)
+      if (params?.filter) queryParams.append('specs', params.filter)
       if (params?.active !== undefined) queryParams.append('active', params.active.toString())
 
       const url = `${this.baseURL}/evaluation-criteria${queryParams.toString() ? `?${queryParams.toString()}` : ''}`

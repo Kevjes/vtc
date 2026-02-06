@@ -102,8 +102,12 @@ export default function DriversPage() {
       setLoading(true)
       setError(null)
 
-      // Build SpringFilter query based on permissions
-      let springFilter = searchTerm || ''
+      // Build SpringFilter (specs) query
+      let springFilter = ''
+      if (searchTerm) {
+        // Search in multiple fields using SpringFilter syntax
+        springFilter = `(user.firstname~~'*${searchTerm}*' or user.lastname~~'*${searchTerm}*' or user.email~~'*${searchTerm}*' or user.phone~~'*${searchTerm}*')`
+      }
 
       // If user only has READ_OWN_DRIVER permission, filter by their UUID
       const hasReadAny = hasAllAccess() || hasPermission(DriverPermissions.READ_ANY_DRIVER)

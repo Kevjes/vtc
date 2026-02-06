@@ -97,7 +97,12 @@ export default function PartnersPage() {
       setError(null)
 
       // Build SpringFilter query based on permissions
-      let springFilter = searchTerm || ''
+      // Build SpringFilter (specs) query
+      let springFilter = ''
+      if (searchTerm) {
+        // Search in multiple fields using SpringFilter syntax
+        springFilter = `(name~~'*${searchTerm}*' or shortName~~'*${searchTerm}*' or email~~'*${searchTerm}*' or phone~~'*${searchTerm}*')`
+      }
 
       // If user only has READ_OWN_PARTNER permission, filter by their partnerId
       const hasReadAny = hasAllAccess() || hasPermission(PartnerPermissions.READ_ANY_PARTNER)
@@ -134,9 +139,9 @@ export default function PartnersPage() {
   // Filter partners based on search and status (client-side for additional filtering)
   const filteredPartners = partners.filter(partner => {
     const matchesSearch = partner.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         partner.shortName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         partner.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         partner.address.toLowerCase().includes(searchTerm.toLowerCase())
+      partner.shortName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      partner.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      partner.address.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesStatus = filterStatus === 'all' || partner.status === filterStatus
 
