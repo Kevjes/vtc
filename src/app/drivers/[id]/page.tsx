@@ -31,10 +31,11 @@ import {
   Modal,
   Select
 } from '@/components/ui'
-import { ApiDriver, ApiPartner, ApiDocument } from '@/types'
+import { ApiDriver, ApiPartner, ApiDocument, ApiDriverPartnerHistory } from '@/types'
 import { driversService } from '@/services/drivers'
 import { partnersService } from '@/services/partners'
 import { usePermissions } from '@/hooks/usePermissions'
+import { useAuth } from '@/contexts/AuthContext'
 import { DriverPermissions } from '@/types'
 
 
@@ -88,11 +89,15 @@ export default function DriverDetailPage() {
   const driverId = typeof params?.id === 'string' ? params.id : ''
   const [driver, setDriver] = useState<ApiDriver | null>(null)
   const [partners, setPartners] = useState<ApiPartner[]>([])
+  const [history, setHistory] = useState<ApiDriverPartnerHistory[]>([])
+  const [evaluations, setEvaluations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [selectedPartnerUuid, setSelectedPartnerUuid] = useState('')
+
+  const { user } = useAuth()
 
   const { hasPermission, hasAllAccess } = usePermissions()
   const canUpdateDocs = hasAllAccess() || hasPermission(DriverPermissions.UPDATE_DRIVER_DOCUMENT)
@@ -104,8 +109,28 @@ export default function DriverDetailPage() {
     setIsLoading(true)
     setError(null)
     try {
+      // Charger d'abord les données essentielles du chauffeur
       const driverData = await driversService.getDriver(driverId)
       setDriver(driverData)
+
+      // Charger l'historique et les évaluations de manière non bloquante
+      Promise.allSettled([
+        driversService.getDriverHistory(driverId),
+        driversService.getDriverEvaluations(driverId)
+      ]).then((results) => {
+        if (results[0].status === 'fulfilled') {
+          setHistory(results[0].value)
+        } else {
+          console.error('Erreur chargement historique:', results[0].reason)
+        }
+
+        if (results[1].status === 'fulfilled') {
+          setEvaluations(results[1].value)
+        } else {
+          console.error('Erreur chargement évaluations:', results[1].reason)
+        }
+      })
+
     } catch (error) {
       console.error('Erreur lors du chargement du chauffeur:', error)
       setError(error instanceof Error ? error.message : 'Erreur lors du chargement')
@@ -151,6 +176,19 @@ export default function DriverDetailPage() {
       await loadDriver()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l\'assignation')
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
+
+  const handleUnassignPartner = async () => {
+    if (!window.confirm('Êtes-vous sûr de vouloir désassigner ce chauffeur de son partenaire actuel ?')) return
+    try {
+      setIsActionLoading(true)
+      await driversService.unassignPartner(driverId)
+      await loadDriver()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la désassignation')
     } finally {
       setIsActionLoading(false)
     }
@@ -223,7 +261,7 @@ export default function DriverDetailPage() {
                 {driver.user.firstname} {driver.user.lastname}
               </h1>
               <p className="text-neutral-600 dark:text-neutral-400 mt-2">
-                Chauffeur VTC • {driver.partnerName || 'Indépendant'}
+                Chauffeur VTC • {driver.partner?.name || 'Indépendant'}
               </p>
             </div>
           </div>
@@ -236,13 +274,34 @@ export default function DriverDetailPage() {
               Modifier
             </Button>
             {canUpdateDriver && (
-              <Button
-                variant="outline"
-                onClick={() => setShowAssignModal(true)}
-              >
-                <UserPlusIcon className="h-4 w-4 mr-2" />
-                {driver.partnerId ? 'Changer Partenaire' : 'Assigner Partenaire'}
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Si c'est un partenaire, on pré-sélectionne son propre UUID
+                    if (user?.type === 'PARTNER' && user.partnerId) {
+                      setSelectedPartnerUuid(user.partnerId)
+                    }
+                    setShowAssignModal(true)
+                  }}
+                  disabled={isActionLoading}
+                >
+                  <UserPlusIcon className="h-4 w-4 mr-2" />
+                  {driver.partner?.uuid ? 'Changer Partenaire' : 'Assigner Partenaire'}
+                </Button>
+                {driver.partner?.uuid && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={handleUnassignPartner}
+                    disabled={isActionLoading}
+                  >
+                    <XCircleIcon className="h-4 w-4 mr-1" />
+                    Désassigner
+                  </Button>
+                )}
+              </div>
             )}
             {getStatusBadge(driver.user.active)}
           </div>
@@ -438,26 +497,31 @@ export default function DriverDetailPage() {
                               <EyeIcon className="h-4 w-4" />
                             </a>
                             {canUpdateDocs && doc.status === 'PENDING' && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-green-600"
-                                  onClick={() => handleUpdateDocStatus(doc.uuid, 'VALIDATED')}
-                                  disabled={isActionLoading}
-                                >
-                                  <CheckCircleIcon className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-red-600"
-                                  onClick={() => handleUpdateDocStatus(doc.uuid, 'REJECTED')}
-                                  disabled={isActionLoading}
-                                >
-                                  <XCircleIcon className="h-4 w-4" />
-                                </Button>
-                              </>
+                              // Seul l'admin ou le partenaire ACTUEL peut valider les documents
+                              (hasAllAccess() || user?.partnerId === driver.partner?.uuid) ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-green-600"
+                                    onClick={() => handleUpdateDocStatus(doc.uuid, 'VALIDATED')}
+                                    disabled={isActionLoading}
+                                  >
+                                    <CheckCircleIcon className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-600"
+                                    onClick={() => handleUpdateDocStatus(doc.uuid, 'REJECTED')}
+                                    disabled={isActionLoading}
+                                  >
+                                    <XCircleIcon className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <span className="text-xs text-neutral-400 italic">Validation restreinte</span>
+                              )
                             )}
                           </div>
                         </td>
@@ -474,23 +538,79 @@ export default function DriverDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Historique des partenaires (Vue 360°) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <CalendarIcon className="h-5 w-5 mr-2" />
+              Parcours & Historique Partenaires
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {history.length > 0 ? (
+                <div className="relative">
+                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-neutral-200 dark:bg-neutral-800"></div>
+                  <div className="space-y-6">
+                    {history.map((h, index) => (
+                      <div key={h.id} className="relative pl-10">
+                        <div className={`absolute left-0 w-8 h-8 rounded-full border-4 border-white dark:border-neutral-900 flex items-center justify-center ${h.status === 'ACTIVE' ? 'bg-green-500' : 'bg-neutral-400'
+                          }`}>
+                          <TruckIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="p-4 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-semibold text-neutral-900 dark:text-neutral-100">
+                              {h.partner.name}
+                            </h4>
+                            <Badge variant={h.status === 'ACTIVE' ? 'success' : 'default'}>
+                              {h.status === 'ACTIVE' ? 'Actuel' : 'Terminé'}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-neutral-600 dark:text-neutral-400 space-y-1">
+                            <p>Début : {new Date(h.startDate).toLocaleDateString('fr-FR')}</p>
+                            {h.endDate && <p>Fin : {new Date(h.endDate).toLocaleDateString('fr-FR')}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-neutral-500">Aucun historique disponible</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Modal Assigner Partenaire */}
         <Modal
           isOpen={showAssignModal}
           onClose={() => setShowAssignModal(false)}
-          title="Assigner un Partenaire"
+          title={driver.partner?.uuid ? "Changer le Partenaire" : "Assigner un Partenaire"}
         >
           <div className="space-y-4 pt-4">
-            <Select
-              label="Choisir un partenaire"
-              value={selectedPartnerUuid}
-              onChange={(e) => setSelectedPartnerUuid(e.target.value)}
-              options={partners.map(p => ({ label: p.name, value: p.uuid }))}
-            />
+            {user?.type === 'PARTNER' ? (
+              <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-100 dark:border-primary-800">
+                <p className="text-sm text-primary-800 dark:text-primary-200">
+                  En tant que partenaire, vous allez assigner ce chauffeur à votre propre flotte.
+                </p>
+                <p className="mt-2 font-semibold text-primary-900 dark:text-primary-100">
+                  Partenaire : {partners.find(p => p.uuid === user.partnerId)?.name || 'Votre entreprise'}
+                </p>
+              </div>
+            ) : (
+              <Select
+                label="Choisir un partenaire"
+                value={selectedPartnerUuid}
+                onChange={(e) => setSelectedPartnerUuid(e.target.value)}
+                options={partners.map(p => ({ label: p.name, value: p.uuid }))}
+              />
+            )}
             <div className="flex justify-end space-x-3 pt-4">
               <Button variant="outline" onClick={() => setShowAssignModal(false)}>Annuler</Button>
-              <Button onClick={handleAssignPartner} disabled={isActionLoading || !selectedPartnerUuid}>
-                {isActionLoading ? 'Assignation...' : 'Confirmer'}
+              <Button onClick={handleAssignPartner} disabled={isActionLoading || (!selectedPartnerUuid && user?.type !== 'PARTNER')}>
+                {isActionLoading ? 'Traitement...' : 'Confirmer'}
               </Button>
             </div>
           </div>
@@ -516,26 +636,36 @@ export default function DriverDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {driver.evaluations && driver.evaluations.length > 0 ? (
-                driver.evaluations.slice(0, 3).map((evaluation: any) => (
+              {evaluations && evaluations.length > 0 ? (
+                evaluations.slice(0, 5).map((evaluation: any) => (
                   <div
                     key={evaluation.uuid}
                     className="p-4 border border-neutral-200 dark:border-neutral-800 rounded-lg"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        {getRatingStars(evaluation.overallRating)}
-                        <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                          {evaluation.overallRating}/5
-                        </span>
+                      <div className="flex mb-1">
+                        {getRatingStars(evaluation.averageScore || evaluation.overallRating)}
+                      </div>
+                      <Badge variant={evaluation.status === 'VALIDATED' ? 'success' : 'info'}>
+                        {evaluation.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                          {evaluation.partner?.name || 'Partenaire inconnu'}
+                        </p>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                          Par {evaluation.evaluator?.firstname} {evaluation.evaluator?.lastname}
+                        </p>
                       </div>
                       <span className="text-sm text-neutral-600 dark:text-neutral-400">
-                        {new Date(evaluation.createdAt).toLocaleDateString('fr-FR')}
+                        {new Date(evaluation.evaluationDate || evaluation.createdAt).toLocaleDateString('fr-FR')}
                       </span>
                     </div>
-                    {evaluation.comment && (
-                      <p className="text-sm text-neutral-600 dark:text-neutral-400 italic">
-                        "{evaluation.comment}"
+                    {evaluation.comments && (
+                      <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 italic">
+                        "{evaluation.comments}"
                       </p>
                     )}
                   </div>

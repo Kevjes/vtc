@@ -407,7 +407,7 @@ export default function DriversPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-neutral-900 dark:text-neutral-100">
-                          {driver.partnerName || 'Indépendant'}
+                          {driver.partner?.name || 'Indépendant'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

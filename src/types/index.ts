@@ -407,6 +407,7 @@ export interface ApiDriver {
   totalRides?: number
   evaluations?: ApiEvaluation[]
   documents?: ApiDocument[]
+  partner?: ApiPartner
   partnerName?: string
   partnerId?: string
   profileImage?: string
@@ -843,4 +844,14 @@ export enum AgentPermissions {
   DELETE_OWN_AGENT = 'CAN_DELETE_OWN_AGENT',
   RESTORE_AGENT = 'CAN_RESTORE_AGENT',
   RESTORE_OWN_AGENT = 'CAN_RESTORE_OWN_AGENT'
+}
+
+// Multi-partner workflow types
+export interface ApiDriverPartnerHistory {
+  id: number
+  driver: ApiDriver
+  partner: ApiPartner
+  startDate: string
+  endDate: string | null
+  status: 'ACTIVE' | 'TERMINATED'
 }

@@ -252,6 +252,46 @@ class DriversService {
     }
   }
 
+  async unassignPartner(driverUuid: string): Promise<any> {
+    try {
+      console.log('🔍 [DriversService] Désassignation partenaire...', driverUuid)
+
+      const response = await authService.authenticatedFetch(`${this.baseURL}/drivers/${driverUuid}/unassign-partner`, {
+        method: 'PUT'
+      })
+
+      const data: ApiResponse<any> = await response.json()
+      if (!data.valid || data.status !== 200) {
+        throw new Error(data.message || 'Erreur lors de la désassignation du partenaire')
+      }
+
+      return data.data
+    } catch (error) {
+      console.error('❌ [DriversService] Erreur unassignPartner:', error)
+      throw error
+    }
+  }
+
+  async getDriverHistory(uuid: string): Promise<any[]> {
+    try {
+      console.log('🔍 [DriversService] Récupération historique chauffeur...', uuid)
+
+      const response = await authService.authenticatedFetch(`${this.baseURL}/drivers/${uuid}/history`, {
+        method: 'GET'
+      })
+
+      const data: ApiResponse<any[]> = await response.json()
+      if (!data.valid || data.status !== 200) {
+        throw new Error(data.message || 'Erreur lors de la récupération de l\'historique')
+      }
+
+      return data.data
+    } catch (error) {
+      console.error('❌ [DriversService] Erreur getDriverHistory:', error)
+      throw error
+    }
+  }
+
   async uploadDriverDocument(uuid: string, file: File, documentType: string): Promise<any> {
     try {
       console.log('🔍 [DriversService] Upload document chauffeur...', uuid, documentType)
@@ -324,11 +364,12 @@ class DriversService {
     try {
       console.log('🔍 [DriversService] Récupération évaluations chauffeur...', uuid)
 
-      const response = await authService.authenticatedFetch(`${this.baseURL}/drivers/${uuid}/evaluations`, {
+      // Utilisation de l'endpoint global avec filtrage par driver.uuid
+      const response = await authService.authenticatedFetch(`${this.baseURL}/evaluations?specs=driver.uuid:'${uuid}'&size=100`, {
         method: 'GET'
       })
 
-      const data: ApiResponse<any[]> = await response.json()
+      const data: ApiResponse<PaginatedResponse<any>> = await response.json()
       console.log('🔍 [DriversService] Réponse API évaluations:', data)
 
       if (!data.valid || data.status !== 200) {
@@ -336,8 +377,10 @@ class DriversService {
         throw new Error(data.message || 'Erreur lors de la récupération des évaluations')
       }
 
-      console.log('✅ [DriversService] Évaluations récupérées:', data.data.length)
-      return data.data
+      // Puisque c'est paginé, on récupère le contenu
+      const evaluations = data.data.content || []
+      console.log('✅ [DriversService] Évaluations récupérées:', evaluations.length)
+      return evaluations
     } catch (error) {
       console.error('❌ [DriversService] Erreur getDriverEvaluations:', error)
       if (error instanceof Error) {
