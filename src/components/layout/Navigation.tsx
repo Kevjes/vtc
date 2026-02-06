@@ -150,33 +150,6 @@ const navigationItems: NavigationItem[] = [
     icon: DocumentArrowUpIcon,
     // Accessible à tous pour l'instant
   },
-  {
-    title: 'Reporting',
-    href: '/reporting',
-    icon: ChartBarIcon,
-    permissions: ['CAN_VIEW_REPORTS'],
-  },
-  {
-    title: 'Notifications',
-    href: '/notifications',
-    icon: BellIcon,
-    badge: 3,
-    permissions: ['CAN_READ_ANY_NOTIFICATION', 'CAN_READ_NOTIFICATION', 'CAN_READ_OWN_NOTIFICATION'],
-  },
-
-  // Configuration et audit
-  {
-    title: 'Paramètres',
-    href: '/settings',
-    icon: Cog6ToothIcon,
-    permissions: ['CAN_READ_ANY_SETTING', 'CAN_READ_SETTING'],
-  },
-  {
-    title: 'Audit',
-    href: '/audit',
-    icon: ClipboardDocumentListIcon,
-    permissions: ['CAN_READ_ANY_ACTIVITY_LOGS', 'CAN_READ_ACTIVITY_LOGS'],
-  },
 ]
 
 interface NavigationProps {
@@ -260,15 +233,9 @@ export function Navigation({ collapsed = false }: NavigationProps) {
 
     // Outils et fonctionnalités
     const toolsNav = items.filter(item =>
-      ['/import-export', '/reporting', '/notifications'].includes(item.href)
+      ['/import-export'].includes(item.href)
     )
     if (toolsNav.length > 0) groups.push({ items: toolsNav })
-
-    // Configuration et audit
-    const configNav = items.filter(item =>
-      ['/settings', '/audit'].includes(item.href)
-    )
-    if (configNav.length > 0) groups.push({ items: configNav })
 
     return groups
   }

@@ -3,13 +3,10 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
   Bars3Icon,
-  MagnifyingGlassIcon,
-  BellIcon,
   SunIcon,
   MoonIcon,
   ArrowRightOnRectangleIcon,
   UserIcon,
-  Cog6ToothIcon,
   ChevronDownIcon
 } from '@heroicons/react/24/outline'
 import { Button, Input, Avatar, Badge } from '@/components/ui'
@@ -65,14 +62,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </Button>
         </div>
 
-        {/* Center section - Search */}
-        <div className="hidden md:block flex-1 max-w-lg mx-8">
-          <Input
-            placeholder="Rechercher..."
-            icon={<MagnifyingGlassIcon className="h-4 w-4" />}
-            className="w-full"
-          />
-        </div>
+
 
         {/* Right section */}
         <div className="flex items-center space-x-3">
@@ -89,15 +79,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             )}
           </Button>
 
-          {/* Notifications */}
-          <div className="relative">
-            <Button variant="ghost" size="icon">
-              <BellIcon className="h-5 w-5" />
-            </Button>
-            <div className="absolute -top-1 -right-1">
-              <Badge variant="danger" size="sm">3</Badge>
-            </div>
-          </div>
+
 
           {/* User menu */}
           <div className="relative" ref={menuRef}>
@@ -142,13 +124,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   Profil
                 </button>
 
-                <button
-                  onClick={() => setShowUserMenu(false)}
-                  className="flex items-center w-full px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
-                >
-                  <Cog6ToothIcon className="h-4 w-4 mr-3" />
-                  Paramètres
-                </button>
+
 
                 <hr className="my-1 border-neutral-200 dark:border-neutral-700" />
 
