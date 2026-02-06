@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
+import {
   ArrowUpTrayIcon,
   ArrowDownTrayIcon,
   DocumentIcon,
@@ -10,41 +10,72 @@ import {
   CloudArrowDownIcon
 } from '@heroicons/react/24/outline'
 import { DashboardLayout } from '@/components/layout'
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Button,
-  FileUpload
+  FileUpload,
+  Badge
 } from '@/components/ui'
+import { importExportService } from '@/services/importExport'
 
 export default function ImportExportPage() {
   const router = useRouter()
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [exportType, setExportType] = useState<string>('')
 
   const handleExport = async (type: string) => {
-    setIsExporting(true)
-    setExportType(type)
-    
+    if (type !== 'drivers') {
+      setError('Seul l\'export des chauffeurs est supporté actuellement via l\'API.')
+      return
+    }
+
     try {
-      // Simulation d'export
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Ici vous pourriez déclencher le téléchargement du fichier
-      console.log(`Export ${type} terminé`)
-    } catch (error) {
-      console.error('Erreur lors de l\'export:', error)
+      setIsExporting(true)
+      setExportType(type)
+      setError(null)
+      setSuccess(null)
+
+      const blob = await importExportService.exportDrivers()
+
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `drivers_export_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      setSuccess('Export réussi !')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de l\'export')
     } finally {
       setIsExporting(false)
       setExportType('')
     }
   }
 
-  const handleFileUpload = (files: File[]) => {
-    console.log('Fichiers uploadés:', files)
-    // Ici vous pourriez traiter les fichiers importés
+  const handleFileUpload = async (files: File[]) => {
+    if (files.length === 0) return
+    const file = files[0]
+
+    try {
+      setIsExporting(true) // Reuse for blocking UI if needed
+      setError(null)
+      setSuccess(null)
+
+      await importExportService.importDrivers(file)
+      setSuccess('Import des chauffeurs réussi !')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de l\'import')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -60,6 +91,18 @@ export default function ImportExportPage() {
           </p>
         </div>
 
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-red-800 dark:text-red-200">{error}</p>
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <p className="text-green-800 dark:text-green-200">{success}</p>
+          </div>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Export */}
           <Card>
@@ -73,10 +116,10 @@ export default function ImportExportPage() {
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 Exportez vos données vers différents formats pour analyse ou sauvegarde.
               </p>
-              
+
               <div className="space-y-3">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   onClick={() => handleExport('drivers')}
                   disabled={isExporting}
@@ -84,9 +127,9 @@ export default function ImportExportPage() {
                   <CloudArrowDownIcon className="h-4 w-4 mr-2" />
                   {isExporting && exportType === 'drivers' ? 'Export en cours...' : 'Exporter les chauffeurs (CSV)'}
                 </Button>
-                
-                <Button 
-                  variant="outline" 
+
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   onClick={() => handleExport('partners')}
                   disabled={isExporting}
@@ -94,9 +137,9 @@ export default function ImportExportPage() {
                   <CloudArrowDownIcon className="h-4 w-4 mr-2" />
                   {isExporting && exportType === 'partners' ? 'Export en cours...' : 'Exporter les partenaires (CSV)'}
                 </Button>
-                
-                <Button 
-                  variant="outline" 
+
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   onClick={() => handleExport('evaluations')}
                   disabled={isExporting}
@@ -104,9 +147,9 @@ export default function ImportExportPage() {
                   <CloudArrowDownIcon className="h-4 w-4 mr-2" />
                   {isExporting && exportType === 'evaluations' ? 'Export en cours...' : 'Exporter les évaluations (CSV)'}
                 </Button>
-                
-                <Button 
-                  variant="outline" 
+
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   onClick={() => handleExport('all')}
                   disabled={isExporting}
@@ -130,14 +173,14 @@ export default function ImportExportPage() {
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 Importez vos données depuis des fichiers CSV ou Excel.
               </p>
-              
+
               <FileUpload
                 onFileSelect={handleFileUpload}
                 accept=".csv,.xlsx,.xls"
                 maxSize={10} // 10MB
                 multiple={true}
               />
-              
+
               <div className="mt-6 p-4 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
                 <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-2">
                   Formats supportés

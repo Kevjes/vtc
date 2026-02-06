@@ -8,7 +8,7 @@ import {
 import { authService } from './auth'
 import { usersService } from './users'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8007/api'
 
 class DriversService {
   private baseURL = API_BASE_URL
@@ -211,6 +211,47 @@ class DriversService {
     }
   }
 
+  async updateDocumentStatus(docId: string | number, status: string): Promise<any> {
+    try {
+      console.log('🔍 [DriversService] Mise à jour statut document...', docId, status)
+
+      const response = await authService.authenticatedFetch(`${API_BASE_URL}/documents/${docId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status })
+      })
+
+      const data: ApiResponse<any> = await response.json()
+      if (!data.valid || data.status !== 200) {
+        throw new Error(data.message || 'Erreur lors de la mise à jour du statut du document')
+      }
+
+      return data.data
+    } catch (error) {
+      console.error('❌ [DriversService] Erreur updateDocumentStatus:', error)
+      throw error
+    }
+  }
+
+  async assignPartner(driverUuid: string, partnerUuid: string): Promise<any> {
+    try {
+      console.log('🔍 [DriversService] Assignation partenaire...', driverUuid, partnerUuid)
+
+      const response = await authService.authenticatedFetch(`${this.baseURL}/drivers/${driverUuid}/assign-partner/${partnerUuid}`, {
+        method: 'PUT'
+      })
+
+      const data: ApiResponse<any> = await response.json()
+      if (!data.valid || data.status !== 200) {
+        throw new Error(data.message || 'Erreur lors de l\'assignation du partenaire')
+      }
+
+      return data.data
+    } catch (error) {
+      console.error('❌ [DriversService] Erreur assignPartner:', error)
+      throw error
+    }
+  }
+
   async uploadDriverDocument(uuid: string, file: File, documentType: string): Promise<any> {
     try {
       console.log('🔍 [DriversService] Upload document chauffeur...', uuid, documentType)
@@ -256,7 +297,7 @@ class DriversService {
     try {
       console.log('🔍 [DriversService] Récupération documents chauffeur...', uuid)
 
-      const response = await authService.authenticatedFetch(`${this.baseURL}/drivers/${uuid}/documents`, {
+      const response = await authService.authenticatedFetch(`${API_BASE_URL}/documents/driver/${uuid}`, {
         method: 'GET'
       })
 

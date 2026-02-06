@@ -15,8 +15,8 @@ import { DashboardLayout } from '@/components/layout'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Textarea, Select, Badge } from '@/components/ui'
 import { evaluationsService, CreateEvaluationRequest } from '@/services/evaluations'
 import { evaluationTemplatesService } from '@/services/evaluationTemplates'
-import { driversService } from '@/services/driversService'
-import { partnersService } from '@/services/partnersService'
+import { driversService } from '@/services/drivers'
+import { partnersService } from '@/services/partners'
 import { authService } from '@/services/auth'
 import { ApiEvaluationTemplate, ApiDriver, ApiPartner, AuthUser, EvaluationPermissions } from '@/types'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -30,12 +30,12 @@ interface EvaluationScore {
   comment: string
 }
 
-const ScoreInput = ({ 
-  score, 
-  onChange 
-}: { 
+const ScoreInput = ({
+  score,
+  onChange
+}: {
   score: EvaluationScore
-  onChange: (score: EvaluationScore) => void 
+  onChange: (score: EvaluationScore) => void
 }) => {
   const handleRatingClick = (rating: number) => {
     onChange({ ...score, numericValue: rating })
@@ -53,7 +53,7 @@ const ScoreInput = ({
           </p>
         )}
       </div>
-      
+
       <div className="space-y-3">
         <div>
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
@@ -69,11 +69,10 @@ const ScoreInput = ({
                   className="focus:outline-none"
                 >
                   <StarIconSolid
-                    className={`h-6 w-6 cursor-pointer transition-colors ${
-                      i < score.numericValue 
-                        ? 'text-yellow-500 hover:text-yellow-600' 
+                    className={`h-6 w-6 cursor-pointer transition-colors ${i < score.numericValue
+                        ? 'text-yellow-500 hover:text-yellow-600'
                         : 'text-neutral-300 dark:text-neutral-600 hover:text-yellow-400'
-                    }`}
+                      }`}
                   />
                 </button>
               ))}
@@ -83,7 +82,7 @@ const ScoreInput = ({
             </span>
           </div>
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
             Commentaire (optionnel)
@@ -114,7 +113,7 @@ export default function NewEvaluationPage() {
   const [templates, setTemplates] = useState<ApiEvaluationTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<ApiEvaluationTemplate | null>(null)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
-  
+
   // États pour le formulaire
   const [formData, setFormData] = useState({
     driverUuid: '',
@@ -125,9 +124,9 @@ export default function NewEvaluationPage() {
     periodStart: '',
     periodEnd: ''
   })
-  
+
   const [scores, setScores] = useState<EvaluationScore[]>([])
-  
+
   // États pour l'interface
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
@@ -145,17 +144,17 @@ export default function NewEvaluationPage() {
           evaluationTemplatesService.getTemplates({ active: true, size: 100 }),
           authService.getCurrentUser()
         ])
-        
+
         setDrivers(driversData.content)
         setPartners(partnersData.content)
         setTemplates(templatesData.content)
         setCurrentUser(userData)
-        
+
         // Définir des valeurs par défaut pour les dates
         const today = new Date()
         const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
         const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0)
-        
+
         // Pré-sélectionner automatiquement les premiers éléments disponibles
         setFormData(prev => ({
           ...prev,
@@ -165,7 +164,7 @@ export default function NewEvaluationPage() {
           periodStart: lastMonth.toISOString().split('T')[0],
           periodEnd: endOfLastMonth.toISOString().split('T')[0]
         }))
-        
+
       } catch (err) {
         console.error('Erreur lors du chargement des données:', err)
         setError(err instanceof Error ? err.message : 'Erreur lors du chargement des données')
@@ -183,7 +182,7 @@ export default function NewEvaluationPage() {
       const template = templates.find(t => t.uuid === formData.templateUuid)
       if (template) {
         setSelectedTemplate(template)
-        
+
         // Initialiser les scores basés sur les critères du template
         if (template.templateCriteriaList && template.templateCriteriaList.length > 0) {
           const initialScores: EvaluationScore[] = template.templateCriteriaList
@@ -215,19 +214,19 @@ export default function NewEvaluationPage() {
 
   const validateForm = (): boolean => {
     const errors: string[] = []
-    
+
     if (!formData.driverUuid) errors.push('Veuillez sélectionner un chauffeur')
     if (!formData.partnerUuid) errors.push('Veuillez sélectionner un partenaire')
     if (!formData.templateUuid) errors.push('Veuillez sélectionner un template')
     if (!formData.periodStart) errors.push('Veuillez définir la date de début')
     if (!formData.periodEnd) errors.push('Veuillez définir la date de fin')
-    
+
     if (formData.periodStart && formData.periodEnd) {
       if (new Date(formData.periodStart) >= new Date(formData.periodEnd)) {
         errors.push('La date de début doit être antérieure à la date de fin')
       }
     }
-    
+
     if (scores.length === 0) {
       errors.push('Aucun critère à évaluer trouvé')
     } else {
@@ -236,7 +235,7 @@ export default function NewEvaluationPage() {
         errors.push(`${unratedScores.length} critère(s) non noté(s)`)
       }
     }
-    
+
     setValidationErrors(errors)
     return errors.length === 0
   }
@@ -258,12 +257,12 @@ export default function NewEvaluationPage() {
     try {
       // Utiliser l'utilisateur connecté comme évaluateur par défaut
       const evaluatorUuid = formData.evaluatorUuid || currentUser?.uuid
-      
+
       if (!evaluatorUuid) {
         setError('Impossible de déterminer l\'évaluateur. Veuillez vous reconnecter.')
         return
       }
-      
+
       const payload: CreateEvaluationRequest = {
         driver: { uuid: formData.driverUuid },
         partner: { uuid: formData.partnerUuid },
@@ -278,9 +277,9 @@ export default function NewEvaluationPage() {
           comment: score.comment
         }))
       }
-      
+
       const newEvaluation = await evaluationsService.createEvaluation(payload)
-      
+
       // Rediriger vers la page de détail
       router.push(`/evaluations/${newEvaluation.uuid}`)
     } catch (err) {
@@ -365,8 +364,8 @@ export default function NewEvaluationPage() {
               <XMarkIcon className="h-4 w-4 mr-2" />
               Annuler
             </Button>
-            <Button 
-              onClick={() => handleSave(false)} 
+            <Button
+              onClick={() => handleSave(false)}
               disabled={isLoading}
             >
               <CheckCircleIcon className="h-4 w-4 mr-2" />
@@ -421,7 +420,7 @@ export default function NewEvaluationPage() {
                   }))}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Partenaire évaluateur *
@@ -436,7 +435,7 @@ export default function NewEvaluationPage() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                 Template d'évaluation *
@@ -461,7 +460,7 @@ export default function NewEvaluationPage() {
                 </div>
               )}
             </div>
-            
+
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
@@ -473,7 +472,7 @@ export default function NewEvaluationPage() {
                   onChange={(e) => handleFormChange('periodStart', e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Fin de période *
@@ -556,7 +555,7 @@ export default function NewEvaluationPage() {
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">Avec commentaires</p>
                 </div>
               </div>
-              
+
               {scores.filter(s => !s.numericValue || s.numericValue <= 0).length > 0 && (
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                   <p className="text-sm text-yellow-700 dark:text-yellow-300">

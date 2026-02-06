@@ -7,11 +7,11 @@ import {
 } from '@/types'
 import { authService } from './auth'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8007/api'
 
 
 class PartnersService {
-  
+
   private baseURL = API_BASE_URL
 
   async getPartners(params?: {
@@ -126,19 +126,62 @@ class PartnersService {
     }
   }
 
-  // Note: UPDATE method not supported by API
   async updatePartner(uuid: string, partnerData: UpdatePartnerRequest): Promise<ApiPartner> {
-    throw new Error('La mise à jour de partenaires n\'est pas supportée par l\'API')
+    try {
+      console.log('🔍 [PartnersService] Mise à jour partenaire...', uuid, partnerData)
+
+      const response = await authService.authenticatedFetch(`${this.baseURL}/partners/${uuid}`, {
+        method: 'PUT',
+        body: JSON.stringify(partnerData)
+      })
+
+      const data: ApiResponse<ApiPartner> = await response.json()
+      console.log('🔍 [PartnersService] Réponse API update partner:', data)
+
+      if (!data.valid || data.status !== 200) {
+        console.log('❌ [PartnersService] Erreur API update partner:', data.message)
+        throw new Error(data.message || 'Erreur lors de la mise à jour du partenaire')
+      }
+
+      console.log('✅ [PartnersService] Partenaire mis à jour:', data.data)
+      return data.data
+    } catch (error) {
+      console.error('❌ [PartnersService] Erreur updatePartner:', error)
+      if (error instanceof Error) {
+        throw error
+      }
+      throw new Error('Erreur de connexion au serveur')
+    }
   }
 
-  // Note: DELETE method not supported by API
   async deletePartner(uuid: string): Promise<void> {
-    throw new Error('La suppression de partenaires n\'est pas supportée par l\'API')
+    try {
+      console.log('🔍 [PartnersService] Suppression partenaire...', uuid)
+
+      const response = await authService.authenticatedFetch(`${this.baseURL}/partners/${uuid}`, {
+        method: 'DELETE'
+      })
+
+      const data: ApiResponse<string> = await response.json()
+      console.log('🔍 [PartnersService] Réponse API delete partner:', data)
+
+      if (!data.valid || data.status !== 200) {
+        console.log('❌ [PartnersService] Erreur API delete partner:', data.message)
+        throw new Error(data.message || 'Erreur lors de la suppression du partenaire')
+      }
+
+      console.log('✅ [PartnersService] Partenaire supprimé')
+    } catch (error) {
+      console.error('❌ [PartnersService] Erreur deletePartner:', error)
+      if (error instanceof Error) {
+        throw error
+      }
+      throw new Error('Erreur de connexion au serveur')
+    }
   }
 
-  // Note: STATUS UPDATE method not supported by API
-  async updatePartnerStatus(uuid: string, active: boolean): Promise<ApiPartner> {
-    throw new Error('La mise à jour du statut des partenaires n\'est pas supportée par l\'API')
+  async updatePartnerStatus(uuid: string, status: string): Promise<ApiPartner> {
+    return this.updatePartner(uuid, { status: status as any })
   }
 }
 

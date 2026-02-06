@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { 
+import {
   ArrowLeftIcon,
   UserIcon,
   TruckIcon,
@@ -12,21 +12,30 @@ import {
   PhoneIcon,
   EnvelopeIcon,
   PencilIcon,
-  EyeIcon
+  EyeIcon,
+  DocumentCheckIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  UserPlusIcon
 } from '@heroicons/react/24/outline'
 import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid'
 import { DashboardLayout } from '@/components/layout'
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  Button, 
-  Badge, 
-  Avatar 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Button,
+  Badge,
+  Avatar,
+  Modal,
+  Select
 } from '@/components/ui'
-import { ApiDriver } from '@/types'
+import { ApiDriver, ApiPartner, ApiDocument } from '@/types'
 import { driversService } from '@/services/drivers'
+import { partnersService } from '@/services/partners'
+import { usePermissions } from '@/hooks/usePermissions'
+import { DriverPermissions } from '@/types'
 
 
 const getStatusBadge = (active: boolean) => {
@@ -53,11 +62,24 @@ const getRatingStars = (rating: number) => {
   return Array.from({ length: 5 }, (_, i) => (
     <StarSolidIcon
       key={i}
-      className={`h-4 w-4 ${
-        i < Math.floor(rating) ? 'text-yellow-500' : 'text-neutral-300 dark:text-neutral-600'
-      }`}
+      className={`h-4 w-4 ${i < Math.floor(rating) ? 'text-yellow-500' : 'text-neutral-300 dark:text-neutral-600'
+        }`}
     />
   ))
+}
+
+const getDocumentStatusBadge = (status: string) => {
+  switch (status?.toUpperCase()) {
+    case 'APPROVED':
+    case 'VALIDATED':
+      return <Badge variant="success" size="sm">Validé</Badge>
+    case 'REJECTED':
+      return <Badge variant="danger" size="sm">Rejeté</Badge>
+    case 'PENDING':
+      return <Badge variant="info" size="sm">En attente</Badge>
+    default:
+      return <Badge variant="default" size="sm">{status}</Badge>
+  }
 }
 
 export default function DriverDetailPage() {
@@ -65,28 +87,74 @@ export default function DriverDetailPage() {
   const params = useParams()
   const driverId = typeof params?.id === 'string' ? params.id : ''
   const [driver, setDriver] = useState<ApiDriver | null>(null)
+  const [partners, setPartners] = useState<ApiPartner[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isActionLoading, setIsActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [selectedPartnerUuid, setSelectedPartnerUuid] = useState('')
+
+  const { hasPermission, hasAllAccess } = usePermissions()
+  const canUpdateDocs = hasAllAccess() || hasPermission(DriverPermissions.UPDATE_DRIVER_DOCUMENT)
+  const canUpdateDriver = hasAllAccess() || hasPermission(DriverPermissions.UPDATE_DRIVER)
+
+  const loadDriver = async () => {
+    if (!driverId) return
+
+    setIsLoading(true)
+    setError(null)
+    try {
+      const driverData = await driversService.getDriver(driverId)
+      setDriver(driverData)
+    } catch (error) {
+      console.error('Erreur lors du chargement du chauffeur:', error)
+      setError(error instanceof Error ? error.message : 'Erreur lors du chargement')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const loadPartners = async () => {
+    try {
+      const response = await partnersService.getPartners({ size: 100 })
+      setPartners(response.content)
+    } catch (error) {
+      console.error('Erreur partners:', error)
+    }
+  }
 
   useEffect(() => {
-    const loadDriver = async () => {
-      if (!driverId) return
-
-      setIsLoading(true)
-      setError(null)
-      try {
-        const driverData = await driversService.getDriver(driverId)
-        setDriver(driverData)
-      } catch (error) {
-        console.error('Erreur lors du chargement du chauffeur:', error)
-        setError(error instanceof Error ? error.message : 'Erreur lors du chargement')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     loadDriver()
-  }, [driverId])
+    if (canUpdateDriver) {
+      loadPartners()
+    }
+  }, [driverId, canUpdateDriver])
+
+  const handleUpdateDocStatus = async (docUuid: string, status: string) => {
+    try {
+      setIsActionLoading(true)
+      await driversService.updateDocumentStatus(docUuid, status)
+      await loadDriver()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour du document')
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
+
+  const handleAssignPartner = async () => {
+    if (!selectedPartnerUuid) return
+    try {
+      setIsActionLoading(true)
+      await driversService.assignPartner(driverId, selectedPartnerUuid)
+      setShowAssignModal(false)
+      await loadDriver()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de l\'assignation')
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -143,8 +211,8 @@ export default function DriverDetailPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={() => router.back()}
             >
@@ -160,13 +228,22 @@ export default function DriverDetailPage() {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <Button 
+            <Button
               variant="outline"
               onClick={() => router.push(`/drivers/${driverId}/edit`)}
             >
               <PencilIcon className="h-4 w-4 mr-2" />
               Modifier
             </Button>
+            {canUpdateDriver && (
+              <Button
+                variant="outline"
+                onClick={() => setShowAssignModal(true)}
+              >
+                <UserPlusIcon className="h-4 w-4 mr-2" />
+                {driver.partnerId ? 'Changer Partenaire' : 'Assigner Partenaire'}
+              </Button>
+            )}
             {getStatusBadge(driver.user.active)}
           </div>
         </div>
@@ -246,7 +323,7 @@ export default function DriverDetailPage() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="flex items-center space-x-3">
                   <EnvelopeIcon className="h-4 w-4 text-neutral-400" />
@@ -325,6 +402,100 @@ export default function DriverDetailPage() {
           </Card>
         </div>
 
+        {/* Documents */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <DocumentCheckIcon className="h-5 w-5 mr-2" />
+              Documents
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-neutral-50 dark:bg-neutral-800">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-neutral-500 uppercase">Type</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-neutral-500 uppercase">Nom du fichier</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-neutral-500 uppercase">Statut</th>
+                    <th className="text-right py-3 px-4 text-xs font-medium text-neutral-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
+                  {driver.documents && driver.documents.length > 0 ? (
+                    driver.documents.map((doc: ApiDocument) => (
+                      <tr key={doc.uuid}>
+                        <td className="py-3 px-4 text-sm">{doc.type}</td>
+                        <td className="py-3 px-4 text-sm">{doc.fileName}</td>
+                        <td className="py-3 px-4 text-sm">{getDocumentStatusBadge(doc.status)}</td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <a
+                              href={doc.url}
+                              target="_blank"
+                              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9"
+                            >
+                              <EyeIcon className="h-4 w-4" />
+                            </a>
+                            {canUpdateDocs && doc.status === 'PENDING' && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-green-600"
+                                  onClick={() => handleUpdateDocStatus(doc.uuid, 'VALIDATED')}
+                                  disabled={isActionLoading}
+                                >
+                                  <CheckCircleIcon className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600"
+                                  onClick={() => handleUpdateDocStatus(doc.uuid, 'REJECTED')}
+                                  disabled={isActionLoading}
+                                >
+                                  <XCircleIcon className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-neutral-500">Aucun document</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Modal Assigner Partenaire */}
+        <Modal
+          isOpen={showAssignModal}
+          onClose={() => setShowAssignModal(false)}
+          title="Assigner un Partenaire"
+        >
+          <div className="space-y-4 pt-4">
+            <Select
+              label="Choisir un partenaire"
+              value={selectedPartnerUuid}
+              onChange={(e) => setSelectedPartnerUuid(e.target.value)}
+              options={partners.map(p => ({ label: p.name, value: p.uuid }))}
+            />
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button variant="outline" onClick={() => setShowAssignModal(false)}>Annuler</Button>
+              <Button onClick={handleAssignPartner} disabled={isActionLoading || !selectedPartnerUuid}>
+                {isActionLoading ? 'Assignation...' : 'Confirmer'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
         {/* Évaluations récentes */}
         <Card>
           <CardHeader>
@@ -386,7 +557,7 @@ export default function DriverDetailPage() {
           >
             Retour à la liste
           </Button>
-          
+
           <div className="flex items-center space-x-3">
             <Button
               variant="outline"

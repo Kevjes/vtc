@@ -63,16 +63,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           >
             <Bars3Icon className="h-5 w-5" />
           </Button>
-          
-          {/* Logo */}
-          <div className="flex items-center space-x-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">VTC</span>
-            </div>
-            <span className="hidden sm:block text-xl font-bold text-neutral-900 dark:text-neutral-100">
-              Dashboard
-            </span>
-          </div>
         </div>
 
         {/* Center section - Search */}

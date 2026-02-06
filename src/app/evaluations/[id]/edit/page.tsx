@@ -16,8 +16,8 @@ import { DashboardLayout } from '@/components/layout'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Textarea, Select, Badge } from '@/components/ui'
 import { evaluationsService, ApiEvaluation, UpdateEvaluationRequest } from '@/services/evaluations'
 import { evaluationTemplatesService } from '@/services/evaluationTemplates'
-import { driversService } from '@/services/driversService'
-import { partnersService } from '@/services/partnersService'
+import { driversService } from '@/services/drivers'
+import { partnersService } from '@/services/partners'
 import { ApiEvaluationTemplate, ApiDriver, ApiPartner, EvaluationPermissions } from '@/types'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useAuth } from '@/contexts/AuthContext'
@@ -122,17 +122,17 @@ export default function EditEvaluationPage() {
 
     // Helper to check if evaluation belongs to current user
     const isOwnEvaluation = (ev: ApiEvaluation | null) => {
-      if (!ev) return false
-      // Check if user is the driver of this evaluation
-      return user?.uuid === ev.driver?.uuid
+        if (!ev) return false
+        // Check if user is the driver of this evaluation
+        return user?.uuid === ev.driver?.uuid
     }
 
     // Helper to check if user can update this specific evaluation
     const canUpdateThisEvaluation = (ev: ApiEvaluation | null) => {
-      if (!ev) return false
-      if (hasAllAccess() || canUpdateEvaluation) return true
-      if (canUpdateOwnEvaluation && isOwnEvaluation(ev)) return true
-      return false
+        if (!ev) return false
+        if (hasAllAccess() || canUpdateEvaluation) return true
+        if (canUpdateOwnEvaluation && isOwnEvaluation(ev)) return true
+        return false
     }
 
     // États pour le formulaire

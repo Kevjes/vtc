@@ -4,13 +4,19 @@ import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button, Input, Card } from '@/components/ui'
+import { authService } from '@/services/auth'
 
 export default function LoginPage() {
+  const [view, setView] = useState<'login' | 'forgot' | 'verify' | 'reset'>('login')
   const [formData, setFormData] = useState({
     login: '',
     password: '',
+    otpCode: '',
+    newPassword: '',
+    confirmPassword: '',
   })
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { login, isAuthenticated, isLoading } = useAuth()
@@ -31,27 +37,80 @@ export default function LoginPage() {
       [name]: value,
     }))
     if (error) setError('')
+    if (success) setSuccess('')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.login || !formData.password) {
-      setError('Veuillez remplir tous les champs')
-      return
-    }
+    if (view === 'login') {
+      if (!formData.login || !formData.password) {
+        setError('Veuillez remplir tous les champs')
+        return
+      }
 
-    setIsSubmitting(true)
-    setError('')
+      setIsSubmitting(true)
+      setError('')
 
-    try {
-      await login(formData)
-      const redirectTo = searchParams?.get('redirect') || '/'
-      router.push(redirectTo)
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erreur de connexion')
-    } finally {
-      setIsSubmitting(false)
+      try {
+        await login({ login: formData.login, password: formData.password })
+        const redirectTo = searchParams?.get('redirect') || '/'
+        router.push(redirectTo)
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Erreur de connexion')
+      } finally {
+        setIsSubmitting(false)
+      }
+    } else if (view === 'forgot') {
+      if (!formData.login) {
+        setError('Veuillez entrer votre nom d\'utilisateur')
+        return
+      }
+      setIsSubmitting(true)
+      try {
+        await authService.forgotPassword(formData.login)
+        setSuccess('Un code OTP a été envoyé (si configuré)')
+        setView('verify')
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Erreur lors de la demande')
+      } finally {
+        setIsSubmitting(false)
+      }
+    } else if (view === 'verify') {
+      if (!formData.otpCode) {
+        setError('Veuillez entrer le code OTP')
+        return
+      }
+      setIsSubmitting(true)
+      try {
+        await authService.verifyOtp(formData.login, formData.otpCode)
+        setSuccess('OTP validé')
+        setView('reset')
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'OTP invalide')
+      } finally {
+        setIsSubmitting(false)
+      }
+    } else if (view === 'reset') {
+      if (!formData.newPassword || formData.newPassword !== formData.confirmPassword) {
+        setError('Les mots de passe ne correspondent pas')
+        return
+      }
+      setIsSubmitting(true)
+      try {
+        await authService.resetPassword({
+          login: formData.login,
+          otpCode: formData.otpCode,
+          newPassword: formData.newPassword,
+          confirmPassword: formData.confirmPassword
+        })
+        setSuccess('Mot de passe réinitialisé avec succès')
+        setView('login')
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Erreur lors de la réinitialisation')
+      } finally {
+        setIsSubmitting(false)
+      }
     }
   }
 
@@ -79,44 +138,133 @@ export default function LoginPage() {
             VTC Dashboard
           </h1>
           <p className="text-white/80">
-            Connectez-vous à votre espace d'administration
+            {view === 'login' ? 'Administration' : 'Récupération de compte'}
           </p>
         </div>
 
-        {/* Login Form */}
+        {/* Form Container */}
         <Card className="p-8 shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="login" className="block text-sm font-medium text-neutral-700 mb-2">
-                Nom d'utilisateur
-              </label>
-              <Input
-                id="login"
-                name="login"
-                type="text"
-                value={formData.login}
-                onChange={handleChange}
-                placeholder="Entrez votre nom d'utilisateur"
-                disabled={isSubmitting}
-                className={error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}
-              />
-            </div>
+            {view === 'login' && (
+              <>
+                <div>
+                  <label htmlFor="login" className="block text-sm font-medium text-neutral-700 mb-2">
+                    Nom d'utilisateur
+                  </label>
+                  <Input
+                    id="login"
+                    name="login"
+                    type="text"
+                    value={formData.login}
+                    onChange={handleChange}
+                    placeholder="Entrez votre nom d'utilisateur"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label htmlFor="password" className="block text-sm font-medium text-neutral-700">
+                      Mot de passe
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setView('forgot')}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      Mot de passe oublié ?
+                    </button>
+                  </div>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Entrez votre mot de passe"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </>
+            )}
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-neutral-700 mb-2">
-                Mot de passe
-              </label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Entrez votre mot de passe"
-                disabled={isSubmitting}
-                className={error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}
-              />
-            </div>
+            {view === 'forgot' && (
+              <>
+                <p className="text-sm text-neutral-600 mb-4">
+                  Entrez votre nom d'utilisateur pour recevoir un code de réinitialisation.
+                </p>
+                <div>
+                  <label htmlFor="login" className="block text-sm font-medium text-neutral-700 mb-2">
+                    Nom d'utilisateur
+                  </label>
+                  <Input
+                    id="login"
+                    name="login"
+                    type="text"
+                    value={formData.login}
+                    onChange={handleChange}
+                    placeholder="Entrez votre nom d'utilisateur"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </>
+            )}
+
+            {view === 'verify' && (
+              <>
+                <p className="text-sm text-neutral-600 mb-4">
+                  Entrez le code OTP que vous avez reçu.
+                </p>
+                <div>
+                  <label htmlFor="otpCode" className="block text-sm font-medium text-neutral-700 mb-2">
+                    Code OTP
+                  </label>
+                  <Input
+                    id="otpCode"
+                    name="otpCode"
+                    type="text"
+                    value={formData.otpCode}
+                    onChange={handleChange}
+                    placeholder="Code à 6 chiffres"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </>
+            )}
+
+            {view === 'reset' && (
+              <>
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="newPassword" className="block text-sm font-medium text-neutral-700 mb-2">
+                      Nouveau mot de passe
+                    </label>
+                    <Input
+                      id="newPassword"
+                      name="newPassword"
+                      type="password"
+                      value={formData.newPassword}
+                      onChange={handleChange}
+                      placeholder="Nouveau mot de passe"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-700 mb-2">
+                      Confirmer le mot de passe
+                    </label>
+                    <Input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type="password"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      placeholder="Confirmez le mot de passe"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-md p-3">
@@ -124,43 +272,45 @@ export default function LoginPage() {
               </div>
             )}
 
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              disabled={isSubmitting}
-              className="w-full"
-            >
-              {isSubmitting ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white mr-2"></div>
-                  Connexion...
-                </div>
-              ) : (
-                'Se connecter'
-              )}
-            </Button>
-          </form>
+            {success && (
+              <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                <p className="text-sm text-green-600">{success}</p>
+              </div>
+            )}
 
-          {/* Demo credentials info */}
-          <div className="mt-6 p-4 bg-neutral-50 rounded-lg border">
-            <p className="text-xs text-neutral-600 mb-2">
-              <strong>Identifiants de démonstration :</strong>
-            </p>
-            <p className="text-xs text-neutral-500">
-              Utilisateur: <code className="bg-neutral-200 px-1 rounded">ADMIN</code>
-            </p>
-            <p className="text-xs text-neutral-500">
-              Mot de passe: <code className="bg-neutral-200 px-1 rounded">++--++--</code>
-            </p>
-          </div>
+            <div className="space-y-3">
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                disabled={isSubmitting}
+                className="w-full"
+              >
+                {isSubmitting ? 'Traitement...' :
+                  view === 'login' ? 'Se connecter' :
+                    view === 'forgot' ? 'Envoyer le code' :
+                      view === 'verify' ? 'Vérifier le code' : 'Réinitialiser'}
+              </Button>
+
+              {view !== 'login' && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setView('login')}
+                  className="w-full"
+                  disabled={isSubmitting}
+                >
+                  Retour au login
+                </Button>
+              )}
+            </div>
+          </form>
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-8">
-          <p className="text-white/60 text-sm">
-            © 2025 VTC Dashboard. Tous droits réservés.
-          </p>
+        <div className="text-center mt-8 text-white/60 text-sm">
+          © 2025 VTC Dashboard. Tous droits réservés.
         </div>
       </div>
     </div>

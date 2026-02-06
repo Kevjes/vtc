@@ -1,6 +1,6 @@
 import { LoginCredentials, AuthResponse, AuthUser, UserType } from '@/types'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8007/api'
 
 class AuthService {
   private baseURL = API_BASE_URL
@@ -97,6 +97,83 @@ class AuthService {
     }
   }
 
+  async getSessions(): Promise<any[]> {
+    try {
+      const response = await this.authenticatedFetch(`${this.baseURL}/sessions`, {
+        method: 'GET'
+      })
+      const data = await response.json()
+      return data.data
+    } catch (error) {
+      console.error('❌ [AuthService] Erreur getSessions:', error)
+      throw error
+    }
+  }
+
+  async verifyOtp(login: string, otpCode: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login, otpCode })
+      })
+      const data = await response.json()
+      if (!data.valid || data.status !== 200) throw new Error(data.message || 'OTP invalide')
+      return data.data
+    } catch (error) {
+      console.error('❌ [AuthService] Erreur verifyOtp:', error)
+      throw error
+    }
+  }
+
+  async forgotPassword(login: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login })
+      })
+      const data = await response.json()
+      if (!data.valid || data.status !== 200) throw new Error(data.message || 'Erreur forgot password')
+      return data.data
+    } catch (error) {
+      console.error('❌ [AuthService] Erreur forgotPassword:', error)
+      throw error
+    }
+  }
+
+  async resetPassword(payload: any): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const data = await response.json()
+      if (!data.valid || data.status !== 200) throw new Error(data.message || 'Erreur reset password')
+      return data.data
+    } catch (error) {
+      console.error('❌ [AuthService] Erreur resetPassword:', error)
+      throw error
+    }
+  }
+
+  async refreshToken(refreshToken: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken })
+      })
+      const data = await response.json()
+      if (!data.valid || data.status !== 200) throw new Error(data.message || 'Erreur refresh token')
+      return data.data
+    } catch (error) {
+      console.error('❌ [AuthService] Erreur refreshToken:', error)
+      throw error
+    }
+  }
+
   async getCurrentUser(): Promise<AuthUser | null> {
     try {
       console.log('🔍 [AuthService] getCurrentUser appelée')
@@ -132,29 +209,7 @@ class AuthService {
     }
   }
 
-  async getSessions(): Promise<any[]> {
-    try {
-      const token = this.getToken()
-      const response = await fetch(`${this.baseURL}/sessions`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
 
-      if (!response.ok) {
-        throw new Error('Erreur lors de la récupération des sessions')
-      }
-
-      return await response.json()
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-      throw new Error('Erreur de connexion au serveur')
-    }
-  }
 
   async logout(): Promise<void> {
     try {
