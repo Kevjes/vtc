@@ -311,12 +311,6 @@ export default function DriversPage() {
                     Contact
                   </th>
                   <th className="text-left py-3 px-6 font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                    Véhicule
-                  </th>
-                  <th className="text-left py-3 px-6 font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                    Note
-                  </th>
-                  <th className="text-left py-3 px-6 font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                     Partenaire
                   </th>
                   <th className="text-left py-3 px-6 font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
@@ -330,13 +324,13 @@ export default function DriversPage() {
               <tbody className="bg-white dark:bg-neutral-900 divide-y divide-neutral-200 dark:divide-neutral-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center text-neutral-500 dark:text-neutral-400">
+                    <td colSpan={5} className="px-6 py-4 text-center text-neutral-500 dark:text-neutral-400">
                       Chargement...
                     </td>
                   </tr>
                 ) : drivers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center text-neutral-500 dark:text-neutral-400">
+                    <td colSpan={5} className="px-6 py-4 text-center text-neutral-500 dark:text-neutral-400">
                       {searchTerm || filterStatus !== 'all'
                         ? 'Aucun chauffeur trouvé avec ces critères'
                         : 'Aucun chauffeur trouvé'
@@ -375,35 +369,6 @@ export default function DriversPage() {
                         <div className="text-sm text-neutral-500 dark:text-neutral-400">
                           {driver.user.phone}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-neutral-900 dark:text-neutral-100">
-                          {driver.status}
-                        </div>
-                        {driver.vehicleInfo && (
-                          <div className="text-sm text-neutral-500 dark:text-neutral-400">
-                            {driver.vehicleInfo.make} {driver.vehicleInfo.model}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {driver.rating ? (
-                          <div className="flex items-center">
-                            <StarIcon className="h-4 w-4 text-yellow-500 mr-1" />
-                            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                              {driver.rating.toFixed(1)}
-                            </span>
-                            {driver.totalRides && (
-                              <span className="text-sm text-neutral-500 dark:text-neutral-400 ml-1">
-                                ({driver.totalRides})
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                            Pas encore noté
-                          </span>
-                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-neutral-900 dark:text-neutral-100">

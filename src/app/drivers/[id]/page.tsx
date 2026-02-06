@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import {
   ArrowLeftIcon,
@@ -96,6 +96,13 @@ export default function DriverDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [selectedPartnerUuid, setSelectedPartnerUuid] = useState('')
+
+  const averageRating = useMemo(() => {
+    const validatedEvaluations = evaluations.filter(ev => ev.status === 'VALIDATED')
+    if (validatedEvaluations.length === 0) return 0
+    const sum = validatedEvaluations.reduce((acc, ev) => acc + (ev.averageScore || 0), 0)
+    return sum / validatedEvaluations.length
+  }, [evaluations])
 
   const { user } = useAuth()
 
@@ -312,13 +319,13 @@ export default function DriverDetailPage() {
           <Card>
             <CardContent className="p-6 text-center">
               <div className="flex items-center justify-center space-x-1 mb-2">
-                {getRatingStars(driver.rating || 0)}
+                {getRatingStars(averageRating)}
               </div>
               <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {driver.rating ? driver.rating.toFixed(1) : 'N/A'}
+                {averageRating > 0 ? averageRating.toFixed(1) : 'N/A'}
               </p>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Note moyenne
+                Note moyenne (Validées)
               </p>
             </CardContent>
           </Card>
@@ -408,57 +415,6 @@ export default function DriverDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Informations véhicule */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <TruckIcon className="h-5 w-5 mr-2" />
-                Véhicule
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Type</p>
-                    <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                      {getVehicleTypeLabel(driver.vehicleType || '')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Marque</p>
-                    <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                      {driver.vehicleInfo?.make || 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Modèle</p>
-                    <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                      {driver.vehicleInfo?.model || 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Année</p>
-                    <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                      {driver.vehicleInfo?.year || 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Couleur</p>
-                    <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                      {driver.vehicleInfo?.color || 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Plaque</p>
-                    <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                      {driver.vehicleInfo?.plateNumber || 'N/A'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Documents */}
