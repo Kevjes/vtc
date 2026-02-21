@@ -18,91 +18,30 @@ import {
   CardTitle,
   Button,
   Input,
-  Select,
-  Textarea
+  Select
 } from '@/components/ui'
-import { PartnerPermissions } from '@/types'
+import { PartnerPermissions, ApiPartner, UpdatePartnerRequest } from '@/types'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useAuth } from '@/contexts/AuthContext'
+import { partnersService } from '@/services/partners'
 
 interface PartnerFormData {
-  companyName: string
-  businessType: string
-  registrationNumber: string
-  taxNumber: string
-  contactFirstName: string
-  contactLastName: string
-  contactEmail: string
-  contactPhone: string
-  contactPosition: string
+  name: string
+  shortName: string
+  status: string
+  email: string
+  phone: string
+  companyIdentifier: string
   address: string
-  city: string
-  region: string
-  country: string
-  postalCode: string
-  website?: string
-  description?: string
-  notes?: string
-  maxDrivers: string
-  commission: string
 }
 
-const businessTypeOptions = [
-  { value: '', label: 'Sélectionner un type d\'entreprise' },
-  { value: 'individual', label: 'Entrepreneur individuel' },
-  { value: 'sarl', label: 'SARL' },
-  { value: 'sa', label: 'SA' },
-  { value: 'association', label: 'Association' },
-  { value: 'cooperative', label: 'Coopérative' },
-  { value: 'other', label: 'Autre' }
+const statusOptions = [
+  { value: '', label: 'Sélectionner un statut' },
+  { value: 'ACTIVE', label: 'Actif' },
+  { value: 'INACTIVE', label: 'Inactif' },
+  { value: 'SUSPENDED', label: 'Suspendu' },
+  { value: 'PENDING', label: 'En attente' }
 ]
-
-const regionOptions = [
-  { value: '', label: 'Sélectionner une région' },
-  { value: 'bamako', label: 'Bamako (Mali)' },
-  { value: 'dakar', label: 'Dakar (Sénégal)' },
-  { value: 'accra', label: 'Accra (Ghana)' },
-  { value: 'abidjan', label: 'Abidjan (Côte d\'Ivoire)' },
-  { value: 'ouagadougou', label: 'Ouagadougou (Burkina Faso)' },
-  { value: 'conakry', label: 'Conakry (Guinée)' },
-  { value: 'niamey', label: 'Niamey (Niger)' }
-]
-
-const countryOptions = [
-  { value: '', label: 'Sélectionner un pays' },
-  { value: 'ML', label: 'Mali' },
-  { value: 'SN', label: 'Sénégal' },
-  { value: 'GH', label: 'Ghana' },
-  { value: 'CI', label: 'Côte d\'Ivoire' },
-  { value: 'BF', label: 'Burkina Faso' },
-  { value: 'GN', label: 'Guinée' },
-  { value: 'NE', label: 'Niger' }
-]
-
-// Mock data - à remplacer par un appel API
-const mockPartner = {
-  id: '1',
-  uuid: 'partner-uuid-1',
-  companyName: 'VTC Plus',
-  businessType: 'sarl',
-  registrationNumber: 'ML-RCCM-2023-001',
-  taxNumber: 'TAX-123456789',
-  contactFirstName: 'Mamadou',
-  contactLastName: 'Diarra',
-  contactEmail: 'contact@vtcplus.ml',
-  contactPhone: '+223 70 12 34 56',
-  contactPosition: 'Directeur général',
-  address: 'Quartier ACI 2000, Rue 456',
-  city: 'Bamako',
-  region: 'bamako',
-  country: 'ML',
-  postalCode: '12345',
-  website: 'https://www.vtcplus.ml',
-  description: 'Entreprise de transport VTC spécialisée dans les services de qualité supérieure.',
-  notes: 'Partenaire prioritaire - bon historique de paiement',
-  maxDrivers: '50',
-  commission: '15.0'
-}
 
 export default function EditPartnerPage() {
   const router = useRouter()
@@ -111,39 +50,28 @@ export default function EditPartnerPage() {
   const { user } = useAuth()
   const { hasPermission, hasAllAccess } = usePermissions()
 
-  const [partner, setPartner] = useState<typeof mockPartner | null>(null)
+  const [partner, setPartner] = useState<ApiPartner | null>(null)
   const [formData, setFormData] = useState<PartnerFormData>({
-    companyName: '',
-    businessType: '',
-    registrationNumber: '',
-    taxNumber: '',
-    contactFirstName: '',
-    contactLastName: '',
-    contactEmail: '',
-    contactPhone: '',
-    contactPosition: '',
-    address: '',
-    city: '',
-    region: '',
-    country: '',
-    postalCode: '',
-    website: '',
-    description: '',
-    notes: '',
-    maxDrivers: '',
-    commission: ''
+    name: '',
+    shortName: '',
+    status: '',
+    email: '',
+    phone: '',
+    companyIdentifier: '',
+    address: ''
   })
 
   const [errors, setErrors] = useState<Partial<Record<keyof PartnerFormData, string>>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Permission helpers
-  const isOwnPartner = (partnerData: typeof mockPartner) => {
+  const isOwnPartner = (partnerData: ApiPartner) => {
     return user?.partnerId === partnerData.uuid
   }
 
-  const canUpdateThisPartner = (partnerData: typeof mockPartner) => {
+  const canUpdateThisPartner = (partnerData: ApiPartner) => {
     if (hasAllAccess()) return true
     if (hasPermission(PartnerPermissions.UPDATE_PARTNER)) return true
     if (hasPermission(PartnerPermissions.UPDATE_OWN_PARTNER) && isOwnPartner(partnerData)) return true
@@ -152,14 +80,30 @@ export default function EditPartnerPage() {
 
   useEffect(() => {
     const loadPartner = async () => {
+      if (!partnerId) {
+        setLoadError('ID du partenaire manquant')
+        setIsLoading(false)
+        return
+      }
+
       setIsLoading(true)
+      setLoadError(null)
+      
       try {
-        // Simulation d'appel API
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        setPartner(mockPartner)
-        setFormData(mockPartner)
+        const data = await partnersService.getPartner(partnerId)
+        setPartner(data)
+        setFormData({
+          name: data.name || '',
+          shortName: data.shortName || '',
+          status: data.status || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          companyIdentifier: data.companyIdentifier || '',
+          address: data.address || ''
+        })
       } catch (error) {
         console.error('Erreur lors du chargement du partenaire:', error)
+        setLoadError(error instanceof Error ? error.message : 'Erreur lors du chargement')
       } finally {
         setIsLoading(false)
       }
@@ -171,40 +115,17 @@ export default function EditPartnerPage() {
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof PartnerFormData, string>> = {}
 
-    if (!formData.companyName.trim()) newErrors.companyName = 'Le nom de l\'entreprise est requis'
-    if (!formData.businessType) newErrors.businessType = 'Le type d\'entreprise est requis'
-    if (!formData.registrationNumber.trim()) newErrors.registrationNumber = 'Le numéro d\'enregistrement est requis'
-    if (!formData.contactFirstName.trim()) newErrors.contactFirstName = 'Le prénom du contact est requis'
-    if (!formData.contactLastName.trim()) newErrors.contactLastName = 'Le nom du contact est requis'
-    if (!formData.contactEmail.trim()) newErrors.contactEmail = 'L\'email du contact est requis'
-    if (!formData.contactPhone.trim()) newErrors.contactPhone = 'Le téléphone du contact est requis'
+    if (!formData.name.trim()) newErrors.name = 'Le nom est requis'
+    if (!formData.shortName.trim()) newErrors.shortName = 'Le nom court est requis'
+    if (!formData.status) newErrors.status = 'Le statut est requis'
+    if (!formData.email.trim()) newErrors.email = 'L\'email est requis'
+    if (!formData.phone.trim()) newErrors.phone = 'Le téléphone est requis'
+    if (!formData.companyIdentifier.trim()) newErrors.companyIdentifier = 'L\'identifiant entreprise est requis'
     if (!formData.address.trim()) newErrors.address = 'L\'adresse est requise'
-    if (!formData.city.trim()) newErrors.city = 'La ville est requise'
-    if (!formData.region) newErrors.region = 'La région est requise'
-    if (!formData.country) newErrors.country = 'Le pays est requis'
-    
-    if (!formData.maxDrivers.trim()) {
-      newErrors.maxDrivers = 'Le nombre maximum de chauffeurs est requis'
-    } else if (isNaN(Number(formData.maxDrivers)) || Number(formData.maxDrivers) <= 0) {
-      newErrors.maxDrivers = 'Veuillez entrer un nombre valide'
-    }
-    
-    if (!formData.commission.trim()) {
-      newErrors.commission = 'Le taux de commission est requis'
-    } else if (isNaN(Number(formData.commission)) || Number(formData.commission) < 0 || Number(formData.commission) > 100) {
-      newErrors.commission = 'Veuillez entrer un pourcentage entre 0 et 100'
-    }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (formData.contactEmail && !emailRegex.test(formData.contactEmail)) {
-      newErrors.contactEmail = 'Format d\'email invalide'
-    }
-
-    if (formData.website && formData.website.trim()) {
-      const urlRegex = /^https?:\/\/.+/
-      if (!urlRegex.test(formData.website)) {
-        newErrors.website = 'L\'URL doit commencer par http:// ou https://'
-      }
+    if (formData.email && !emailRegex.test(formData.email)) {
+      newErrors.email = 'Format d\'email invalide'
     }
 
     setErrors(newErrors)
@@ -227,13 +148,23 @@ export default function EditPartnerPage() {
     setIsSubmitting(true)
 
     try {
-      // Simulation d'appel API
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      const updateData: UpdatePartnerRequest = {
+        name: formData.name,
+        shortName: formData.shortName,
+        status: formData.status as any,
+        email: formData.email,
+        phone: formData.phone,
+        companyIdentifier: formData.companyIdentifier,
+        address: formData.address
+      }
+
+      await partnersService.updatePartner(partnerId, updateData)
 
       // Succès - rediriger vers le profil du partenaire
-      router.push(`/partners/${partnerId}?success=partner-updated`)
+      router.push(`/partners/${partnerId}`)
     } catch (error) {
       console.error('Erreur lors de la modification du partenaire:', error)
+      alert(error instanceof Error ? error.message : 'Erreur lors de la modification')
     } finally {
       setIsSubmitting(false)
     }
@@ -254,6 +185,29 @@ export default function EditPartnerPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
             <p className="mt-2 text-neutral-600 dark:text-neutral-400">Chargement...</p>
           </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="p-8 max-w-md text-center">
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+              Erreur
+            </h2>
+            <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+              {loadError}
+            </p>
+            <div className="mt-6">
+              <Button onClick={() => router.back()}>
+                <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                Retour
+              </Button>
+            </div>
+          </Card>
         </div>
       </DashboardLayout>
     )
@@ -307,7 +261,7 @@ export default function EditPartnerPage() {
                 Modifier le partenaire
               </h1>
               <p className="text-neutral-600 dark:text-neutral-400 mt-2">
-                {formData.companyName}
+                {formData.name}
               </p>
             </div>
           </div>
@@ -326,87 +280,60 @@ export default function EditPartnerPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
                   label="Nom de l'entreprise *"
-                  value={formData.companyName}
-                  onChange={(e) => handleInputChange('companyName', e.target.value)}
-                  error={errors.companyName}
+                  value={formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  error={errors.name}
                 />
-                <Select
-                  label="Type d'entreprise *"
-                  value={formData.businessType}
-                  onChange={(e) => handleInputChange('businessType', e.target.value)}
-                  options={businessTypeOptions}
-                  error={errors.businessType}
+                <Input
+                  label="Nom court *"
+                  value={formData.shortName}
+                  onChange={(e) => handleInputChange('shortName', e.target.value)}
+                  error={errors.shortName}
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
-                  label="Numéro d'enregistrement *"
-                  value={formData.registrationNumber}
-                  onChange={(e) => handleInputChange('registrationNumber', e.target.value)}
-                  error={errors.registrationNumber}
+                  label="Identifiant entreprise *"
+                  value={formData.companyIdentifier}
+                  onChange={(e) => handleInputChange('companyIdentifier', e.target.value)}
+                  error={errors.companyIdentifier}
                 />
-                <Input
-                  label="Numéro fiscal"
-                  value={formData.taxNumber}
-                  onChange={(e) => handleInputChange('taxNumber', e.target.value)}
-                  error={errors.taxNumber}
+                <Select
+                  label="Statut *"
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', e.target.value)}
+                  options={statusOptions}
+                  error={errors.status}
                 />
               </div>
-              <Input
-                label="Site web"
-                type="url"
-                value={formData.website}
-                onChange={(e) => handleInputChange('website', e.target.value)}
-                error={errors.website}
-              />
             </CardContent>
           </Card>
 
-          {/* Contact principal */}
+          {/* Contact */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <UserIcon className="h-5 w-5 mr-2" />
-                Contact principal
+                Contact
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
-                  label="Prénom *"
-                  value={formData.contactFirstName}
-                  onChange={(e) => handleInputChange('contactFirstName', e.target.value)}
-                  error={errors.contactFirstName}
-                />
-                <Input
-                  label="Nom *"
-                  value={formData.contactLastName}
-                  onChange={(e) => handleInputChange('contactLastName', e.target.value)}
-                  error={errors.contactLastName}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
                   label="Email *"
                   type="email"
-                  value={formData.contactEmail}
-                  onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                  error={errors.contactEmail}
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  error={errors.email}
                 />
                 <Input
                   label="Téléphone *"
                   type="tel"
-                  value={formData.contactPhone}
-                  onChange={(e) => handleInputChange('contactPhone', e.target.value)}
-                  error={errors.contactPhone}
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  error={errors.phone}
                 />
               </div>
-              <Input
-                label="Poste/Fonction"
-                value={formData.contactPosition}
-                onChange={(e) => handleInputChange('contactPosition', e.target.value)}
-                error={errors.contactPosition}
-              />
             </CardContent>
           </Card>
 
@@ -424,86 +351,6 @@ export default function EditPartnerPage() {
                 value={formData.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
                 error={errors.address}
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Ville *"
-                  value={formData.city}
-                  onChange={(e) => handleInputChange('city', e.target.value)}
-                  error={errors.city}
-                />
-                <Input
-                  label="Code postal"
-                  value={formData.postalCode}
-                  onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                  error={errors.postalCode}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Select
-                  label="Région *"
-                  value={formData.region}
-                  onChange={(e) => handleInputChange('region', e.target.value)}
-                  options={regionOptions}
-                  error={errors.region}
-                />
-                <Select
-                  label="Pays *"
-                  value={formData.country}
-                  onChange={(e) => handleInputChange('country', e.target.value)}
-                  options={countryOptions}
-                  error={errors.country}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Configuration */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuration partenaire</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Nombre maximum de chauffeurs *"
-                  type="number"
-                  min="1"
-                  value={formData.maxDrivers}
-                  onChange={(e) => handleInputChange('maxDrivers', e.target.value)}
-                  error={errors.maxDrivers}
-                />
-                <Input
-                  label="Taux de commission (%) *"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={formData.commission}
-                  onChange={(e) => handleInputChange('commission', e.target.value)}
-                  error={errors.commission}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Description et notes */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Informations complémentaires</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Textarea
-                label="Description de l'activité"
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                rows={3}
-              />
-              <Textarea
-                label="Notes internes"
-                value={formData.notes}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
-                rows={3}
               />
             </CardContent>
           </Card>
