@@ -320,22 +320,10 @@ export interface ApiPermission {
 }
 
 export interface ApiSession {
-  uuid: string
-  version: number
-  code: string
-  slug?: string
-  createdBy?: number
-  createdDate: string
-  lastModifiedBy?: number
-  lastModifiedDate: string
-  deleted?: boolean
-  isDeletable?: boolean
-  sessionId: string
-  userId: string
+  user: ApiUser
+  deviceInfo?: string
   ipAddress?: string
-  userAgent?: string
-  active: boolean
-  expiresAt: string
+  lastActivityTime?: string
 }
 
 // Create/Update DTOs

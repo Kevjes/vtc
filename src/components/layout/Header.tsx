@@ -116,16 +116,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setShowUserMenu(false)}
-                  className="flex items-center w-full px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
-                >
-                  <UserIcon className="h-4 w-4 mr-3" />
-                  Profil
-                </button>
-
-
-
                 <hr className="my-1 border-neutral-200 dark:border-neutral-700" />
 
                 <button

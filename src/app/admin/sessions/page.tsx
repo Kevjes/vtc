@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { DashboardLayout } from '@/components/layout'
 import { Button, Card, Input, Modal, Badge } from '@/components/ui'
-import { EyeIcon, MagnifyingGlassIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { EyeIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { sessionsService } from '@/services/sessions'
 import type { ApiSession } from '@/types'
 
@@ -51,33 +51,14 @@ export default function SessionsPage() {
     setShowViewModal(true)
   }
 
-  const isSessionExpired = (expiresAt: string): boolean => {
-    return new Date(expiresAt) < new Date()
-  }
-
-  const getSessionStatus = (session: ApiSession): 'active' | 'expired' | 'inactive' => {
-    if (!session.active) return 'inactive'
-    if (isSessionExpired(session.expiresAt)) return 'expired'
-    return 'active'
-  }
-
-  const formatDuration = (expiresAt: string): string => {
-    const now = new Date()
-    const expires = new Date(expiresAt)
-    const diff = expires.getTime() - now.getTime()
-
-    if (diff <= 0) return 'Expirée'
-
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-
-    if (hours > 0) return `${hours}h ${minutes}m`
-    return `${minutes}m`
+  const formatDateTime = (dateString?: string): string => {
+    if (!dateString) return 'N/A'
+    return new Date(dateString).toLocaleString()
   }
 
   const filteredSessions = sessions.filter(session =>
-    session.sessionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    session.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (session.user?.username && session.user.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (session.user?.email && session.user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (session.ipAddress && session.ipAddress.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
@@ -90,7 +71,7 @@ export default function SessionsPage() {
               Gestion des Sessions
             </h1>
             <p className="text-neutral-600 dark:text-neutral-400">
-              Surveillez les sessions utilisateurs actives et inactives
+              Surveillez les sessions utilisateurs actives
             </p>
           </div>
         </div>
@@ -108,7 +89,7 @@ export default function SessionsPage() {
                 <div className="relative">
                   <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" />
                   <Input
-                    placeholder="Rechercher par session, utilisateur ou IP..."
+                    placeholder="Rechercher par utilisateur, email ou IP..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -123,10 +104,10 @@ export default function SessionsPage() {
               <thead className="bg-neutral-50 dark:bg-neutral-800">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                    Session
+                    Utilisateur
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                    Utilisateur
+                    Email
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                     Adresse IP
@@ -135,10 +116,7 @@ export default function SessionsPage() {
                     Statut
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                    Expiration
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                    Créée le
+                    Dernière activité
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                     Actions
@@ -148,75 +126,60 @@ export default function SessionsPage() {
               <tbody className="bg-white dark:bg-neutral-900 divide-y divide-neutral-200 dark:divide-neutral-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center text-neutral-500 dark:text-neutral-400">
+                    <td colSpan={6} className="px-6 py-4 text-center text-neutral-500 dark:text-neutral-400">
                       Chargement...
                     </td>
                   </tr>
                 ) : filteredSessions.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center text-neutral-500 dark:text-neutral-400">
+                    <td colSpan={6} className="px-6 py-4 text-center text-neutral-500 dark:text-neutral-400">
                       Aucune session trouvée
                     </td>
                   </tr>
                 ) : (
-                  filteredSessions.map((session) => {
-                    const status = getSessionStatus(session)
-                    return (
-                      <tr key={session.uuid} className="hover:bg-neutral-50 dark:hover:bg-neutral-800">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                            {session.sessionId.substring(0, 20)}...
-                          </div>
-                          <div className="text-sm text-neutral-500 dark:text-neutral-400">
-                            {session.code}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-neutral-900 dark:text-neutral-100">
-                            {session.userId}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-neutral-900 dark:text-neutral-100">
-                            {session.ipAddress || 'Non disponible'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge
-                            variant={
-                              status === 'active' ? 'success' :
-                              status === 'expired' ? 'warning' : 'danger'
-                            }
+                  filteredSessions.map((session, index) => (
+                    <tr key={session.user?.uuid || index} className="hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                          {session.user?.username || 'N/A'}
+                        </div>
+                        <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                          {session.user?.firstname} {session.user?.lastname}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-neutral-900 dark:text-neutral-100">
+                          {session.user?.email || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-neutral-900 dark:text-neutral-100">
+                          {session.ipAddress || 'Non disponible'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant={session.user?.active ? 'success' : 'danger'}>
+                          {session.user?.active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-neutral-900 dark:text-neutral-100">
+                          {formatDateTime(session.lastActivityTime)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openViewModal(session)}
                           >
-                            {status === 'active' ? 'Active' :
-                             status === 'expired' ? 'Expirée' : 'Inactive'}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-neutral-900 dark:text-neutral-100">
-                            {formatDuration(session.expiresAt)}
-                          </div>
-                          <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                            {new Date(session.expiresAt).toLocaleString()}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500 dark:text-neutral-400">
-                          {new Date(session.createdDate).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openViewModal(session)}
-                            >
-                              <EyeIcon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
+                            <EyeIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -257,45 +220,49 @@ export default function SessionsPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  UUID
+                  Utilisateur
                 </label>
-                <p className="text-neutral-900 dark:text-neutral-100 font-mono text-sm break-all">
-                  {selectedSession.uuid}
+                <p className="text-neutral-900 dark:text-neutral-100">
+                  {selectedSession.user?.username || 'N/A'}
                 </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Session ID
-                </label>
-                <p className="text-neutral-900 dark:text-neutral-100 font-mono text-sm break-all">
-                  {selectedSession.sessionId}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Code
-                </label>
-                <p className="text-neutral-900 dark:text-neutral-100 font-mono">
-                  {selectedSession.code}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Utilisateur ID
-                </label>
-                <p className="text-neutral-900 dark:text-neutral-100">{selectedSession.userId}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Adresse IP
+                    Prénom
                   </label>
                   <p className="text-neutral-900 dark:text-neutral-100">
-                    {selectedSession.ipAddress || 'Non disponible'}
+                    {selectedSession.user?.firstname || 'N/A'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                    Nom
+                  </label>
+                  <p className="text-neutral-900 dark:text-neutral-100">
+                    {selectedSession.user?.lastname || 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Email
+                </label>
+                <p className="text-neutral-900 dark:text-neutral-100">
+                  {selectedSession.user?.email || 'N/A'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                    Téléphone
+                  </label>
+                  <p className="text-neutral-900 dark:text-neutral-100">
+                    {selectedSession.user?.phone || 'N/A'}
                   </p>
                 </div>
 
@@ -303,25 +270,48 @@ export default function SessionsPage() {
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                     Statut
                   </label>
-                  <Badge
-                    variant={
-                      getSessionStatus(selectedSession) === 'active' ? 'success' :
-                      getSessionStatus(selectedSession) === 'expired' ? 'warning' : 'danger'
-                    }
-                  >
-                    {getSessionStatus(selectedSession) === 'active' ? 'Active' :
-                     getSessionStatus(selectedSession) === 'expired' ? 'Expirée' : 'Inactive'}
+                  <Badge variant={selectedSession.user?.active ? 'success' : 'danger'}>
+                    {selectedSession.user?.active ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
               </div>
 
-              {selectedSession.userAgent && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Adresse IP
+                </label>
+                <p className="text-neutral-900 dark:text-neutral-100">
+                  {selectedSession.ipAddress || 'Non disponible'}
+                </p>
+              </div>
+
+              {selectedSession.deviceInfo && (
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    User Agent
+                    Informations de l'appareil
                   </label>
                   <p className="text-neutral-900 dark:text-neutral-100 text-sm break-all">
-                    {selectedSession.userAgent}
+                    {selectedSession.deviceInfo}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Dernière activité
+                </label>
+                <p className="text-neutral-900 dark:text-neutral-100">
+                  {formatDateTime(selectedSession.lastActivityTime)}
+                </p>
+              </div>
+
+              {selectedSession.user?.lastLogin && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                    Dernière connexion
+                  </label>
+                  <p className="text-neutral-900 dark:text-neutral-100">
+                    {formatDateTime(selectedSession.user.lastLogin)}
                   </p>
                 </div>
               )}
@@ -329,84 +319,33 @@ export default function SessionsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Version
-                  </label>
-                  <p className="text-neutral-900 dark:text-neutral-100">{selectedSession.version}</p>
-                </div>
-
-                {selectedSession.slug && (
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                      Slug
-                    </label>
-                    <p className="text-neutral-900 dark:text-neutral-100">{selectedSession.slug}</p>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Expire le
-                </label>
-                <p className="text-neutral-900 dark:text-neutral-100">
-                  {new Date(selectedSession.expiresAt).toLocaleString()}
-                </p>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  {formatDuration(selectedSession.expiresAt)}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Créée le
+                    Ville
                   </label>
                   <p className="text-neutral-900 dark:text-neutral-100">
-                    {new Date(selectedSession.createdDate).toLocaleString()}
+                    {selectedSession.user?.city || 'N/A'}
                   </p>
-                  {selectedSession.createdBy && (
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                      Par: {selectedSession.createdBy}
-                    </p>
-                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Modifiée le
+                    Pays
                   </label>
                   <p className="text-neutral-900 dark:text-neutral-100">
-                    {new Date(selectedSession.lastModifiedDate).toLocaleString()}
+                    {selectedSession.user?.country || 'N/A'}
                   </p>
-                  {selectedSession.lastModifiedBy && (
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                      Par: {selectedSession.lastModifiedBy}
-                    </p>
-                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {selectedSession.user?.address && (
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Supprimable
+                    Adresse
                   </label>
-                  <Badge variant={selectedSession.isDeletable ? 'warning' : 'info'}>
-                    {selectedSession.isDeletable ? 'Oui' : 'Non'}
-                  </Badge>
+                  <p className="text-neutral-900 dark:text-neutral-100">
+                    {selectedSession.user.address}
+                  </p>
                 </div>
-
-                {selectedSession.deleted !== undefined && (
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                      Supprimée
-                    </label>
-                    <Badge variant={selectedSession.deleted ? 'danger' : 'success'}>
-                      {selectedSession.deleted ? 'Oui' : 'Non'}
-                    </Badge>
-                  </div>
-                )}
-              </div>
+              )}
 
               <div className="flex justify-end pt-4">
                 <Button variant="outline" onClick={() => setShowViewModal(false)}>
