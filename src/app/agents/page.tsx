@@ -33,8 +33,6 @@ export default function AgentsPage() {
   const canCreateAgent = hasAllAccess() || hasPermission(AgentPermissions.CREATE_AGENT)
   const canUpdateAgent = hasAllAccess() || hasPermission(AgentPermissions.UPDATE_AGENT)
   const canUpdateOwnAgent = hasAllAccess() || hasPermission(AgentPermissions.UPDATE_OWN_AGENT)
-  const canDeleteAgent = hasAllAccess() || hasPermission(AgentPermissions.DELETE_AGENT)
-  const canDeleteOwnAgent = hasAllAccess() || hasPermission(AgentPermissions.DELETE_OWN_AGENT)
 
   // Permission helpers
   const isOwnAgent = (agent: ApiAgent) => {
@@ -46,13 +44,6 @@ export default function AgentsPage() {
     if (hasAllAccess()) return true
     if (canUpdateAgent) return true
     if (canUpdateOwnAgent && isOwnAgent(agent)) return true
-    return false
-  }
-
-  const canDeleteThisAgent = (agent: ApiAgent) => {
-    if (hasAllAccess()) return true
-    if (canDeleteAgent) return true
-    if (canDeleteOwnAgent && isOwnAgent(agent)) return true
     return false
   }
 
@@ -231,7 +222,19 @@ export default function AgentsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Button variant="outline" size="sm" onClick={() => handleViewAgent(agent.uuid)}>Voir</Button>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleViewAgent(agent.uuid)}>Voir</Button>
+                          {canUpdateThisAgent(agent) && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => router.push(`/admin/users/${agent.user.uuid}/edit`)}
+                              title="Modifier l'utilisateur"
+                            >
+                              Modifier
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

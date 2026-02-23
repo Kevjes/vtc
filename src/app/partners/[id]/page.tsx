@@ -5,13 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import {
   ArrowLeftIcon,
   BuildingOfficeIcon,
-  UserIcon,
   MapPinIcon,
-  CalendarIcon,
-  PhoneIcon,
-  EnvelopeIcon,
-  GlobeAltIcon,
-  PencilIcon,
   EyeIcon,
   UsersIcon
 } from '@heroicons/react/24/outline'
@@ -124,13 +118,6 @@ export default function PartnerDetailPage() {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/partners/${partnerId}/edit`)}
-            >
-              <PencilIcon className="h-4 w-4 mr-2" />
-              Modifier
-            </Button>
             {getStatusBadge(partner.status)}
           </div>
         </div>
@@ -310,12 +297,6 @@ export default function PartnerDetailPage() {
               onClick={() => router.push(`/drivers/new?partner=${partner.uuid}`)}
             >
               Ajouter un chauffeur
-            </Button>
-            <Button
-              onClick={() => router.push(`/partners/${partnerId}/edit`)}
-            >
-              <PencilIcon className="h-4 w-4 mr-2" />
-              Modifier le partenaire
             </Button>
           </div>
         </div>

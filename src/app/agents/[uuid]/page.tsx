@@ -28,8 +28,6 @@ export default function AgentDetailPage() {
   ])
   const canUpdateAgent = hasAllAccess() || hasPermission(AgentPermissions.UPDATE_AGENT)
   const canUpdateOwnAgent = hasAllAccess() || hasPermission(AgentPermissions.UPDATE_OWN_AGENT)
-  const canDeleteAgent = hasAllAccess() || hasPermission(AgentPermissions.DELETE_AGENT)
-  const canDeleteOwnAgent = hasAllAccess() || hasPermission(AgentPermissions.DELETE_OWN_AGENT)
 
   // Permission helpers
   const isOwnAgent = (agentData: ApiAgent) => {
@@ -44,16 +42,8 @@ export default function AgentDetailPage() {
     return false
   }
 
-  const canDeleteThisAgent = (agentData: ApiAgent) => {
-    if (hasAllAccess()) return true
-    if (canDeleteAgent) return true
-    if (canDeleteOwnAgent && isOwnAgent(agentData)) return true
-    return false
-  }
-
   // Determine actual permissions based on ownership
   const canEdit = agent ? canUpdateThisAgent(agent) : false
-  const canDelete = agent ? canDeleteThisAgent(agent) : false
 
   useEffect(() => {
     if (!uuid) return
@@ -129,15 +119,9 @@ export default function AgentDetailPage() {
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.push('/agents')}>Retour</Button>
             {canEdit && (
-              <Button onClick={() => router.push(`/agents/${uuid}/edit`)}>Modifier</Button>
-            )}
-            {canDelete && (
-              <Button variant="danger" onClick={() => {
-                if (confirm('Êtes-vous sûr de vouloir supprimer cet agent ?')) {
-                  // TODO: Implement delete functionality
-                  console.log('Delete agent:', uuid)
-                }
-              }}>Supprimer</Button>
+              <Button onClick={() => router.push(`/admin/users/${agent.user.uuid}/edit`)}>
+                Modifier l'utilisateur
+              </Button>
             )}
           </div>
         </div>

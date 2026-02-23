@@ -8,12 +8,11 @@ import {
   FunnelIcon,
   EyeIcon,
   PencilIcon,
-  TrashIcon,
   BuildingOfficeIcon,
   ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { DashboardLayout } from '@/components/layout'
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Avatar, Modal } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Avatar } from '@/components/ui'
 import { partnersService } from '@/services/partners'
 import type { ApiPartner } from '@/types'
 import { PartnerPermissions } from '@/types'
@@ -47,8 +46,6 @@ export default function PartnersPage() {
   const canCreatePartner = hasAllAccess() || hasPermission(PartnerPermissions.CREATE_PARTNER)
   const canUpdatePartner = hasAllAccess() || hasPermission(PartnerPermissions.UPDATE_PARTNER)
   const canUpdateOwnPartner = hasAllAccess() || hasPermission(PartnerPermissions.UPDATE_OWN_PARTNER)
-  const canDeletePartner = hasAllAccess() || hasPermission(PartnerPermissions.DELETE_PARTNER)
-  const canDeleteOwnPartner = hasAllAccess() || hasPermission(PartnerPermissions.DELETE_OWN_PARTNER)
 
   // Helper to check if partner belongs to current user
   const isOwnPartner = (partner: ApiPartner) => {
@@ -64,20 +61,11 @@ export default function PartnersPage() {
     return false
   }
 
-  // Helper to check if user can delete a specific partner
-  const canDeleteThisPartner = (partner: ApiPartner) => {
-    if (hasAllAccess() || canDeletePartner) return true
-    if (canDeleteOwnPartner && isOwnPartner(partner)) return true
-    return false
-  }
-
   const [partners, setPartners] = useState<ApiPartner[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'ACTIVE' | 'SUSPENDED' | 'PENDING'>('all')
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [selectedPartner, setSelectedPartner] = useState<ApiPartner | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
@@ -152,41 +140,10 @@ export default function PartnersPage() {
     router.push(`/partners/${partnerUuid}`)
   }
 
-  const handleEditPartner = (partnerUuid: string) => {
-    router.push(`/partners/${partnerUuid}/edit`)
-  }
-
-  const handleDeletePartner = (partner: ApiPartner) => {
-    // Check permission before showing delete modal
-    if (!canDeleteThisPartner(partner)) {
-      setError("Vous n'avez pas la permission de supprimer ce partenaire")
-      return
-    }
-    setSelectedPartner(partner)
-    setShowDeleteModal(true)
-  }
-
-  const confirmDelete = async () => {
-    if (!selectedPartner) return
-
-    // Double check permission before deletion
-    if (!canDeleteThisPartner(selectedPartner)) {
-      setError("Vous n'avez pas la permission de supprimer ce partenaire")
-      setShowDeleteModal(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      await partnersService.deletePartner(selectedPartner.uuid)
-      setShowDeleteModal(false)
-      setSelectedPartner(null)
-      await loadPartners()
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erreur lors de la suppression')
-    } finally {
-      setLoading(false)
-    }
+  const handleEditUser = (userUuid: string) => {
+    // Les partenaires n'ont pas d'utilisateur associé direct comme les drivers
+    // On redirige vers la page d'édition du partenaire
+    router.push(`/admin/users/${userUuid}/edit`)
   }
 
   const activePartnersCount = filteredPartners.filter(p => p.status === 'ACTIVE').length
@@ -470,25 +427,11 @@ export default function PartnersPage() {
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handleEditPartner(partner.uuid)
+                                router.push(`/partners/${partner.uuid}/edit`)
                               }}
                               title="Modifier"
                             >
                               <PencilIcon className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {canDeleteThisPartner(partner) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeletePartner(partner)
-                              }}
-                              title="Supprimer"
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <TrashIcon className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
@@ -528,40 +471,6 @@ export default function PartnersPage() {
             </div>
           )}
         </Card>
-
-        {/* Delete Confirmation Modal */}
-        <Modal
-          isOpen={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
-          title="Confirmer la suppression"
-        >
-          <div className="space-y-4">
-            <p className="text-neutral-600 dark:text-neutral-400">
-              Êtes-vous sûr de vouloir supprimer le partenaire{' '}
-              <span className="font-medium">
-                {selectedPartner?.name}
-              </span> ?
-            </p>
-            <p className="text-sm text-red-600">
-              Cette action est irréversible et supprimera toutes les données associées.
-            </p>
-            <div className="flex items-center justify-end space-x-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowDeleteModal(false)}
-              >
-                Annuler
-              </Button>
-              <Button
-                variant="danger"
-                onClick={confirmDelete}
-                disabled={loading}
-              >
-                {loading ? 'Suppression...' : 'Supprimer'}
-              </Button>
-            </div>
-          </div>
-        </Modal>
       </div>
     </DashboardLayout>
   )
