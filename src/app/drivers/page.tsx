@@ -8,12 +8,11 @@ import {
   FunnelIcon,
   EyeIcon,
   PencilIcon,
-  TrashIcon,
   ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { StarIcon } from '@heroicons/react/24/solid'
 import { DashboardLayout } from '@/components/layout'
-import { Card, Button, Input, Badge, Avatar, Modal } from '@/components/ui'
+import { Card, Button, Input, Badge, Avatar } from '@/components/ui'
 import { driversService } from '@/services/drivers'
 import { DriverPermissions } from '@/types'
 import type { ApiDriver } from '@/types'
@@ -50,8 +49,6 @@ export default function DriversPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [selectedDriver, setSelectedDriver] = useState<ApiDriver | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
@@ -66,8 +63,6 @@ export default function DriversPage() {
   const canCreateDriver = hasAllAccess() || hasPermission(DriverPermissions.CREATE_DRIVER)
   const canUpdateDriver = hasAllAccess() || hasPermission(DriverPermissions.UPDATE_DRIVER)
   const canUpdateOwnDriver = hasAllAccess() || hasPermission(DriverPermissions.UPDATE_OWN_DRIVER)
-  const canDeleteDriver = hasAllAccess() || hasPermission(DriverPermissions.DELETE_DRIVER)
-  const canDeleteOwnDriver = hasAllAccess() || hasPermission(DriverPermissions.DELETE_OWN_DRIVER)
 
   // Helper to check if driver belongs to current user
   const isOwnDriver = (targetDriver: ApiDriver) => {
@@ -78,13 +73,6 @@ export default function DriversPage() {
   const canUpdateThisDriver = (targetDriver: ApiDriver) => {
     if (hasAllAccess() || canUpdateDriver) return true
     if (canUpdateOwnDriver && isOwnDriver(targetDriver)) return true
-    return false
-  }
-
-  // Helper to check if user can delete a specific driver
-  const canDeleteThisDriver = (targetDriver: ApiDriver) => {
-    if (hasAllAccess() || canDeleteDriver) return true
-    if (canDeleteOwnDriver && isOwnDriver(targetDriver)) return true
     return false
   }
 
@@ -145,41 +133,8 @@ export default function DriversPage() {
     router.push(`/drivers/${driverUuid}`)
   }
 
-  const handleEditDriver = (driverUuid: string) => {
-    router.push(`/drivers/${driverUuid}/edit`)
-  }
-
-  const handleDeleteDriver = (driver: ApiDriver) => {
-    // Check permission before showing delete modal
-    if (!canDeleteThisDriver(driver)) {
-      setError("Vous n'avez pas la permission de supprimer ce chauffeur")
-      return
-    }
-    setSelectedDriver(driver)
-    setShowDeleteModal(true)
-  }
-
-  const confirmDelete = async () => {
-    if (!selectedDriver) return
-
-    // Double check permission before deletion
-    if (!canDeleteThisDriver(selectedDriver)) {
-      setError("Vous n'avez pas la permission de supprimer ce chauffeur")
-      setShowDeleteModal(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      await driversService.deleteDriver(selectedDriver.uuid)
-      setShowDeleteModal(false)
-      setSelectedDriver(null)
-      await loadDrivers()
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erreur lors de la suppression')
-    } finally {
-      setLoading(false)
-    }
+  const handleEditUser = (userUuid: string) => {
+    router.push(`/admin/users/${userUuid}/edit`)
   }
 
   const toggleDriverStatus = async (driver: ApiDriver) => {
@@ -402,9 +357,9 @@ export default function DriversPage() {
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleEditDriver(driver.uuid)
+                                  handleEditUser(driver.user.uuid)
                                 }}
-                                title="Modifier"
+                                title="Modifier l'utilisateur"
                               >
                                 <PencilIcon className="h-4 w-4" />
                               </Button>
@@ -422,20 +377,6 @@ export default function DriversPage() {
                                 </span>
                               </Button>
                             </>
-                          )}
-                          {canDeleteThisDriver(driver) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeleteDriver(driver)
-                              }}
-                              title="Supprimer"
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </Button>
                           )}
                         </div>
                       </td>
@@ -474,40 +415,6 @@ export default function DriversPage() {
             </div>
           )}
         </Card>
-
-        {/* Delete Confirmation Modal */}
-        <Modal
-          isOpen={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
-          title="Confirmer la suppression"
-        >
-          <div className="space-y-4">
-            <p className="text-neutral-600 dark:text-neutral-400">
-              Êtes-vous sûr de vouloir supprimer le chauffeur{' '}
-              <span className="font-medium">
-                {selectedDriver?.user.firstname} {selectedDriver?.user.lastname}
-              </span> ?
-            </p>
-            <p className="text-sm text-red-600">
-              Cette action est irréversible et supprimera toutes les données associées.
-            </p>
-            <div className="flex items-center justify-end space-x-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowDeleteModal(false)}
-              >
-                Annuler
-              </Button>
-              <Button
-                variant="danger"
-                onClick={confirmDelete}
-                disabled={loading}
-              >
-                {loading ? 'Suppression...' : 'Supprimer'}
-              </Button>
-            </div>
-          </div>
-        </Modal>
       </div>
     </DashboardLayout>
   )

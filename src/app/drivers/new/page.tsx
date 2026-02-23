@@ -1,19 +1,17 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeftIcon,
   UserIcon,
   TruckIcon,
-  CheckCircleIcon,
   ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { DashboardLayout } from '@/components/layout'
 import { Card, Button, Input, Select } from '@/components/ui'
 import { driversService } from '@/services/drivers'
 import { DriverPermissions } from '@/types'
-import type { CreateDriverRequest, CreateVehicleInfoRequest, CreateInsuranceRequest } from '@/types'
 import { usePermissions } from '@/hooks/usePermissions'
 
 interface DriverFormData {
@@ -25,61 +23,41 @@ interface DriverFormData {
   address: string
   city: string
   country: string
-  countryISO: string
+  countryCode: string
   dob: string
-  licenseNumber: string
-
-  // Informations véhicule
-  vehicleType: string
-  vehicleMake: string
-  vehicleModel: string
-  vehicleYear: number | ''
-  vehicleColor: string
-  plateNumber: string
-
-  // Assurance
-  insuranceProvider: string
-  insurancePolicyNumber: string
-  insuranceExpirationDate: string
-
-  // Partenaire
-  partnerId: string
-
-  // Statut
-  active: boolean
+  
+  // Informations permis
+  licenseID: string
+  issueDate: string
+  expiryDate: string
+  issuedAt: string
+  status: string
 }
-
-const vehicleTypeOptions = [
-  { value: '', label: 'Sélectionner un type de véhicule' },
-  { value: 'CAR', label: 'Voiture' },
-  { value: 'MOTORCYCLE', label: 'Moto' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'TRUCK', label: 'Camion' },
-]
 
 const countryOptions = [
   { value: '', label: 'Sélectionner un pays' },
   { value: 'Mali', label: 'Mali' },
+  { value: 'Cameroon', label: 'Cameroun' },
   { value: 'Sénégal', label: 'Sénégal' },
   { value: 'Burkina Faso', label: 'Burkina Faso' },
   { value: 'Côte d\'Ivoire', label: 'Côte d\'Ivoire' },
 ]
 
-const countryISOOptions = [
+const countryCodeOptions = [
   { value: '', label: 'Code pays' },
   { value: 'ML', label: 'ML (Mali)' },
+  { value: 'CM', label: 'CM (Cameroun)' },
   { value: 'SN', label: 'SN (Sénégal)' },
   { value: 'BF', label: 'BF (Burkina Faso)' },
   { value: 'CI', label: 'CI (Côte d\'Ivoire)' },
 ]
 
-const currentYear = new Date().getFullYear()
-const vehicleYearOptions = [
-  { value: '', label: 'Année du véhicule' },
-  ...Array.from({ length: 30 }, (_, i) => ({
-    value: String(currentYear - i),
-    label: String(currentYear - i)
-  }))
+const statusOptions = [
+  { value: '', label: 'Sélectionner un statut' },
+  { value: 'PENDING', label: 'En attente' },
+  { value: 'APPROVED', label: 'Approuvé' },
+  { value: 'REJECTED', label: 'Rejeté' },
+  { value: 'EXPIRED', label: 'Expiré' },
 ]
 
 export default function NewDriverPage() {
@@ -97,20 +75,13 @@ export default function NewDriverPage() {
     address: '',
     city: '',
     country: '',
-    countryISO: '',
+    countryCode: '',
     dob: '',
-    licenseNumber: '',
-    vehicleType: '',
-    vehicleMake: '',
-    vehicleModel: '',
-    vehicleYear: '',
-    vehicleColor: '',
-    plateNumber: '',
-    insuranceProvider: '',
-    insurancePolicyNumber: '',
-    insuranceExpirationDate: '',
-    partnerId: '',
-    active: true
+    licenseID: '',
+    issueDate: '',
+    expiryDate: '',
+    issuedAt: '',
+    status: 'PENDING'
   })
 
   const [errors, setErrors] = useState<Partial<Record<keyof DriverFormData, string>>>({})
@@ -125,9 +96,11 @@ export default function NewDriverPage() {
     if (!formData.email.trim()) newErrors.email = 'L\'email est requis'
     if (!formData.phone.trim()) newErrors.phone = 'Le téléphone est requis'
     if (!formData.dob) newErrors.dob = 'La date de naissance est requise'
-    if (!formData.licenseNumber.trim()) newErrors.licenseNumber = 'Le numéro de permis est requis'
-    if (!formData.vehicleType) newErrors.vehicleType = 'Le type de véhicule est requis'
-    if (!formData.countryISO) newErrors.countryISO = 'Le code pays est requis'
+    if (!formData.licenseID.trim()) newErrors.licenseID = 'Le numéro de permis est requis'
+    if (!formData.issueDate) newErrors.issueDate = 'La date d\'émission est requise'
+    if (!formData.expiryDate) newErrors.expiryDate = 'La date d\'expiration est requise'
+    if (!formData.issuedAt.trim()) newErrors.issuedAt = 'Le lieu d\'émission est requis'
+    if (!formData.countryCode) newErrors.countryCode = 'Le code pays est requis'
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -142,6 +115,15 @@ export default function NewDriverPage() {
       const age = today.getFullYear() - birthDate.getFullYear()
       if (age < 18) {
         newErrors.dob = 'Le chauffeur doit être majeur (18 ans minimum)'
+      }
+    }
+
+    // License dates validation
+    if (formData.issueDate && formData.expiryDate) {
+      const issue = new Date(formData.issueDate)
+      const expiry = new Date(formData.expiryDate)
+      if (expiry <= issue) {
+        newErrors.expiryDate = 'La date d\'expiration doit être après la date d\'émission'
       }
     }
 
@@ -166,40 +148,24 @@ export default function NewDriverPage() {
     setError(null)
 
     try {
-      const vehicleInfo: CreateVehicleInfoRequest | undefined =
-        formData.vehicleMake || formData.vehicleModel || formData.vehicleYear || formData.vehicleColor || formData.plateNumber
-          ? {
-              make: formData.vehicleMake,
-              model: formData.vehicleModel,
-              year: Number(formData.vehicleYear) || new Date().getFullYear(),
-              color: formData.vehicleColor,
-              plateNumber: formData.plateNumber,
-              insurance: formData.insuranceProvider ? {
-                provider: formData.insuranceProvider,
-                policyNumber: formData.insurancePolicyNumber,
-                expirationDate: formData.insuranceExpirationDate
-              } : undefined
-            }
-          : undefined
-
-      const driverData: CreateDriverRequest = {
-        firstname: formData.firstname,
-        lastname: formData.lastname,
-        email: formData.email,
+      const driverData = {
         phone: formData.phone,
+        lastname: formData.lastname,
+        firstname: formData.firstname,
+        dob: formData.dob,
+        email: formData.email,
         address: formData.address || undefined,
         city: formData.city || undefined,
         country: formData.country || undefined,
-        countryISO: formData.countryISO,
-        dob: formData.dob,
-        licenseNumber: formData.licenseNumber,
-        vehicleType: formData.vehicleType,
-        vehicleInfo,
-        partnerId: formData.partnerId || undefined,
-        active: formData.active
+        countryCode: formData.countryCode,
+        licenseID: formData.licenseID,
+        issueDate: formData.issueDate,
+        expiryDate: formData.expiryDate,
+        issuedAt: formData.issuedAt,
+        status: formData.status
       }
 
-      await driversService.createDriver(driverData)
+      await driversService.createDriver(driverData as any)
 
       // Succès - rediriger vers la liste des chauffeurs
       router.push('/drivers?success=driver-created')
@@ -323,33 +289,20 @@ export default function NewDriverPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Email *
-                  </label>
-                  <Input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    placeholder="email@exemple.com"
-                    error={errors.email}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Téléphone *
-                  </label>
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    placeholder="+223 XX XX XX XX"
-                    error={errors.phone}
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Email *
+                </label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="landryjohn2000@gmail.com"
+                  error={errors.email}
+                />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                     Date de naissance *
@@ -361,6 +314,20 @@ export default function NewDriverPage() {
                     error={errors.dob}
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                    Téléphone *
+                  </label>
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    placeholder="+221926564286"
+                    error={errors.phone}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                     Pays
@@ -376,10 +343,10 @@ export default function NewDriverPage() {
                     Code pays *
                   </label>
                   <Select
-                    value={formData.countryISO}
-                    onChange={(e) => handleInputChange('countryISO', e.target.value)}
-                    options={countryISOOptions}
-                    error={errors.countryISO}
+                    value={formData.countryCode}
+                    onChange={(e) => handleInputChange('countryCode', e.target.value)}
+                    options={countryCodeOptions}
+                    error={errors.countryCode}
                   />
                 </div>
               </div>
@@ -392,7 +359,7 @@ export default function NewDriverPage() {
                   <Input
                     value={formData.address}
                     onChange={(e) => handleInputChange('address', e.target.value)}
-                    placeholder="Adresse complète"
+                    placeholder="123 Avenue de la Liberté"
                   />
                 </div>
                 <div>
@@ -402,171 +369,81 @@ export default function NewDriverPage() {
                   <Input
                     value={formData.city}
                     onChange={(e) => handleInputChange('city', e.target.value)}
-                    placeholder="Ville"
+                    placeholder="Douala"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Numéro de permis *
-                </label>
-                <Input
-                  value={formData.licenseNumber}
-                  onChange={(e) => handleInputChange('licenseNumber', e.target.value)}
-                  placeholder="Numéro de permis de conduire"
-                  error={errors.licenseNumber}
-                />
               </div>
             </div>
           </Card>
 
-          {/* Informations véhicule */}
+          {/* Informations permis de conduire */}
           <Card>
             <div className="p-6 border-b border-neutral-200 dark:border-neutral-700">
               <div className="flex items-center gap-2">
                 <TruckIcon className="h-5 w-5 text-neutral-500" />
                 <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
-                  Informations véhicule
+                  Informations permis de conduire
                 </h3>
               </div>
             </div>
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Type de véhicule *
+                  Numéro de permis *
                 </label>
-                <Select
-                  value={formData.vehicleType}
-                  onChange={(e) => handleInputChange('vehicleType', e.target.value)}
-                  options={vehicleTypeOptions}
-                  error={errors.vehicleType}
+                <Input
+                  value={formData.licenseID}
+                  onChange={(e) => handleInputChange('licenseID', e.target.value)}
+                  placeholder="CM-DRV-123458"
+                  error={errors.licenseID}
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Marque
+                    Date d'émission *
                   </label>
                   <Input
-                    value={formData.vehicleMake}
-                    onChange={(e) => handleInputChange('vehicleMake', e.target.value)}
-                    placeholder="Toyota, Peugeot..."
+                    type="date"
+                    value={formData.issueDate}
+                    onChange={(e) => handleInputChange('issueDate', e.target.value)}
+                    error={errors.issueDate}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Modèle
+                    Date d'expiration *
                   </label>
                   <Input
-                    value={formData.vehicleModel}
-                    onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
-                    placeholder="Corolla, 208..."
+                    type="date"
+                    value={formData.expiryDate}
+                    onChange={(e) => handleInputChange('expiryDate', e.target.value)}
+                    error={errors.expiryDate}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Année
+                    Lieu d'émission *
                   </label>
-                  <Select
-                    value={formData.vehicleYear.toString()}
-                    onChange={(e) => handleInputChange('vehicleYear', e.target.value ? parseInt(e.target.value) : '')}
-                    options={vehicleYearOptions}
+                  <Input
+                    value={formData.issuedAt}
+                    onChange={(e) => handleInputChange('issuedAt', e.target.value)}
+                    placeholder="Douala"
+                    error={errors.issuedAt}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Couleur
-                  </label>
-                  <Input
-                    value={formData.vehicleColor}
-                    onChange={(e) => handleInputChange('vehicleColor', e.target.value)}
-                    placeholder="Blanc, Noir, Rouge..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Plaque d'immatriculation
-                  </label>
-                  <Input
-                    value={formData.plateNumber}
-                    onChange={(e) => handleInputChange('plateNumber', e.target.value)}
-                    placeholder="ABC-123-ML"
-                  />
-                </div>
-              </div>
-
-              {/* Assurance */}
-              <div className="border-t border-neutral-200 dark:border-neutral-700 pt-4">
-                <h4 className="text-md font-medium text-neutral-900 dark:text-neutral-100 mb-3">
-                  Assurance (optionnel)
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                      Assureur
-                    </label>
-                    <Input
-                      value={formData.insuranceProvider}
-                      onChange={(e) => handleInputChange('insuranceProvider', e.target.value)}
-                      placeholder="Nom de l'assureur"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                      Numéro de police
-                    </label>
-                    <Input
-                      value={formData.insurancePolicyNumber}
-                      onChange={(e) => handleInputChange('insurancePolicyNumber', e.target.value)}
-                      placeholder="Numéro de police"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                      Date d'expiration
-                    </label>
-                    <Input
-                      type="date"
-                      value={formData.insuranceExpirationDate}
-                      onChange={(e) => handleInputChange('insuranceExpirationDate', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Paramètres */}
-          <Card>
-            <div className="p-6 border-b border-neutral-200 dark:border-neutral-700">
-              <div className="flex items-center gap-2">
-                <CheckCircleIcon className="h-5 w-5 text-neutral-500" />
-                <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
-                  Paramètres
-                </h3>
-              </div>
-            </div>
-            <div className="p-6 space-y-4">
               <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.active}
-                    onChange={(e) => handleInputChange('active', e.target.checked)}
-                    className="rounded border-neutral-300 dark:border-neutral-600"
-                  />
-                  <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                    Chauffeur actif
-                  </span>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Statut du permis *
                 </label>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                  Les chauffeurs actifs peuvent recevoir des courses
-                </p>
+                <Select
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', e.target.value)}
+                  options={statusOptions}
+                />
               </div>
             </div>
           </Card>

@@ -275,10 +275,10 @@ export default function DriverDetailPage() {
           <div className="flex items-center space-x-3">
             <Button
               variant="outline"
-              onClick={() => router.push(`/drivers/${driverId}/edit`)}
+              onClick={() => router.push(`/admin/users/${driver.user.uuid}/edit`)}
             >
               <PencilIcon className="h-4 w-4 mr-2" />
-              Modifier
+              Modifier l'utilisateur
             </Button>
             {canUpdateDriver && (
               <div className="flex items-center space-x-2">
@@ -652,10 +652,10 @@ export default function DriverDetailPage() {
               Nouvelle évaluation
             </Button>
             <Button
-              onClick={() => router.push(`/drivers/${driverId}/edit`)}
+              onClick={() => router.push(`/admin/users/${driver.user.uuid}/edit`)}
             >
               <PencilIcon className="h-4 w-4 mr-2" />
-              Modifier le profil
+              Modifier l'utilisateur
             </Button>
           </div>
         </div>
