@@ -9,7 +9,7 @@ import {
   ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 import { DashboardLayout } from '@/components/layout'
-import { Card, Button, Input, Select } from '@/components/ui'
+import { Card, Button, Input, Select, PhoneInput } from '@/components/ui'
 import { driversService } from '@/services/drivers'
 import { DriverPermissions } from '@/types'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -33,24 +33,6 @@ interface DriverFormData {
   issuedAt: string
   status: string
 }
-
-const countryOptions = [
-  { value: '', label: 'Sélectionner un pays' },
-  { value: 'Mali', label: 'Mali' },
-  { value: 'Cameroon', label: 'Cameroun' },
-  { value: 'Sénégal', label: 'Sénégal' },
-  { value: 'Burkina Faso', label: 'Burkina Faso' },
-  { value: 'Côte d\'Ivoire', label: 'Côte d\'Ivoire' },
-]
-
-const countryCodeOptions = [
-  { value: '', label: 'Code pays' },
-  { value: 'ML', label: 'ML (Mali)' },
-  { value: 'CM', label: 'CM (Cameroun)' },
-  { value: 'SN', label: 'SN (Sénégal)' },
-  { value: 'BF', label: 'BF (Burkina Faso)' },
-  { value: 'CI', label: 'CI (Côte d\'Ivoire)' },
-]
 
 const statusOptions = [
   { value: '', label: 'Sélectionner un statut' },
@@ -192,6 +174,23 @@ export default function NewDriverPage() {
     }
   }
 
+  const handlePhoneChange = (phone: string, countryCode: string, country: string) => {
+    setFormData(prev => ({
+      ...prev,
+      phone,
+      countryCode,
+      country
+    }))
+
+    // Clear errors
+    if (errors.phone) {
+      setErrors(prev => ({ ...prev, phone: undefined }))
+    }
+    if (errors.countryCode) {
+      setErrors(prev => ({ ...prev, countryCode: undefined }))
+    }
+  }
+
   // Check if user has permission to access this page
   if (!canCreateDriver) {
     return (
@@ -318,36 +317,17 @@ export default function NewDriverPage() {
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                     Téléphone *
                   </label>
-                  <Input
+                  <PhoneInput
                     value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    placeholder="+221926564286"
+                    onChange={handlePhoneChange}
+                    placeholder="926564286"
                     error={errors.phone}
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Pays
-                  </label>
-                  <Select
-                    value={formData.country}
-                    onChange={(e) => handleInputChange('country', e.target.value)}
-                    options={countryOptions}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                    Code pays *
-                  </label>
-                  <Select
-                    value={formData.countryCode}
-                    onChange={(e) => handleInputChange('countryCode', e.target.value)}
-                    options={countryCodeOptions}
-                    error={errors.countryCode}
-                  />
+                  {formData.country && (
+                    <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                      Pays détecté: {formData.country} ({formData.countryCode})
+                    </p>
+                  )}
                 </div>
               </div>
 
