@@ -44,6 +44,8 @@ export interface ApiEvaluation {
   status: 'PENDING' | 'COMPLETED' | 'VALIDATED' | 'REJECTED'
   scores: ApiEvaluationScore[]
   overallScore?: number
+  averageScore?: number
+  evaluationScores?: ApiEvaluationScore[]
 }
 
 export interface ApiEvaluationScore {

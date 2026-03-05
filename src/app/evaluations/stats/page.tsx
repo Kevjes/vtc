@@ -165,24 +165,24 @@ export default function EvaluationStatsPage() {
         filterParts.push(`template.uuid='${filters.template}'`)
       }
       
-      const params: any = { size: 1000 } // Récupérer plus de données pour les stats
+      const params: any = {}
       if (filterParts.length > 0) {
-        params.filter = `(${filterParts.join(' AND ')})`
+        params.filter = `(${filterParts.join(' and ')})`
       }
 
-      const data = await evaluationsService.getEvaluations(params)
-      setEvaluations(data.content)
+      const data = await evaluationStatsService.getEvaluationStats(params)
+      setEvaluations(data)
       
       // Calculer les statistiques
-      const calculatedStats = evaluationStatsService.calculateStats(data.content)
+      const calculatedStats = evaluationStatsService.calculateStats(data)
       setStats(calculatedStats)
       
       // Extraire les partenaires et templates uniques
       const uniquePartners = Array.from(
-        new Map(data.content.map(e => [e.partner.uuid, e.partner])).values()
+        new Map(data.map(e => [e.partner.uuid, e.partner])).values()
       )
       const uniqueTemplates = Array.from(
-        new Map(data.content.map(e => [e.template.uuid, e.template])).values()
+        new Map(data.map(e => [e.template.uuid, e.template])).values()
       )
       
       setPartners(uniquePartners)

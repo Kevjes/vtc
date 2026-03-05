@@ -1,4 +1,4 @@
-import { ApiResponse, PaginatedResponse } from '@/types'
+import { ApiResponse } from '@/types'
 import { authService } from './auth'
 import { ApiEvaluation } from './evaluations'
 
@@ -35,18 +35,17 @@ class EvaluationStatsService {
 
   async getEvaluationStats(params?: { 
     filter?: string
-    startDate?: string
-    endDate?: string
-  }): Promise<PaginatedResponse<ApiEvaluation>> {
+  }): Promise<ApiEvaluation[]> {
     try {
-      console.log('🔍 [EvaluationStatsService] Récupération des statistiques...')
+      console.log('🔍 [EvaluationStatsService] Récupération des statistiques avec params:', params)
 
       const queryParams = new URLSearchParams()
-      if (params?.filter) queryParams.append('filter', params.filter)
-      if (params?.startDate) queryParams.append('startDate', params.startDate)
-      if (params?.endDate) queryParams.append('endDate', params.endDate)
+      if (params?.filter) {
+        queryParams.append('filter', params.filter)
+      }
 
       const url = `${this.baseURL}/stats/evaluations${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      console.log('🔍 [EvaluationStatsService] URL:', url)
 
       const response = await authService.authenticatedFetch(url, { method: 'GET' })
       if (!response.ok) {
@@ -58,7 +57,7 @@ class EvaluationStatsService {
         throw new Error('Réponse vide du serveur')
       }
 
-      let data: ApiResponse<PaginatedResponse<ApiEvaluation>>
+      let data: ApiResponse<ApiEvaluation[]>
       try {
         data = JSON.parse(text)
       } catch (parseError) {
@@ -72,8 +71,8 @@ class EvaluationStatsService {
         throw new Error(data.message || 'Erreur lors de la récupération des statistiques')
       }
 
-      console.log('✅ [EvaluationStatsService] Statistiques récupérées:', data.data.content.length)
-      return data.data
+      console.log('✅ [EvaluationStatsService] Statistiques récupérées:', data.data?.length || 0, 'évaluations')
+      return data.data || []
     } catch (error) {
       console.error('❌ [EvaluationStatsService] Erreur getEvaluationStats:', error)
       if (error instanceof Error) throw error
@@ -81,10 +80,11 @@ class EvaluationStatsService {
     }
   }
 
-  async getEvaluationsByMonth(year: number, month: number): Promise<PaginatedResponse<ApiEvaluation>> {
+  async getEvaluationsByMonth(year: number, month: number): Promise<ApiEvaluation[]> {
     try {
       const startDate = `${year}-${month.toString().padStart(2, '0')}-01`
-      const endDate = `${year}-${month.toString().padStart(2, '0')}-31`
+      const lastDay = new Date(year, month, 0).getDate()
+      const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay}`
       const filter = `(evaluationDate >= '${startDate}' and evaluationDate <= '${endDate}')`
       
       return this.getEvaluationStats({ filter })
@@ -95,7 +95,7 @@ class EvaluationStatsService {
     }
   }
 
-  async getEvaluationsByDriver(driverEmail: string): Promise<PaginatedResponse<ApiEvaluation>> {
+  async getEvaluationsByDriver(driverEmail: string): Promise<ApiEvaluation[]> {
     try {
       const filter = `(driver.user.email='${driverEmail}')`
       
@@ -107,7 +107,7 @@ class EvaluationStatsService {
     }
   }
 
-  async getRecentEvaluations(days: number = 30): Promise<PaginatedResponse<ApiEvaluation>> {
+  async getRecentEvaluations(days: number = 30): Promise<ApiEvaluation[]> {
     try {
       const date = new Date()
       date.setDate(date.getDate() - days)
@@ -130,10 +130,10 @@ class EvaluationStatsService {
     const validatedEvaluations = evaluations.filter(e => e.status === 'VALIDATED').length
     const rejectedEvaluations = evaluations.filter(e => e.status === 'REJECTED').length
 
-    // Calcul de la note moyenne
-    const completedWithScores = evaluations.filter(e => e.status === 'COMPLETED' && e.overallScore)
-    const averageScore = completedWithScores.length > 0 
-      ? completedWithScores.reduce((sum, e) => sum + (e.overallScore || 0), 0) / completedWithScores.length
+    // Calcul de la note moyenne (incluant toutes les évaluations avec un score)
+    const evaluationsWithScores = evaluations.filter(e => e.averageScore !== undefined && e.averageScore !== null)
+    const averageScore = evaluationsWithScores.length > 0 
+      ? evaluationsWithScores.reduce((sum, e) => sum + (e.averageScore || 0), 0) / evaluationsWithScores.length
       : 0
 
     // Évaluations par mois
@@ -144,10 +144,10 @@ class EvaluationStatsService {
 
     // Évaluations par statut
     const evaluationsByStatus = [
-      { status: 'COMPLETED', count: completedEvaluations, percentage: (completedEvaluations / totalEvaluations) * 100 },
-      { status: 'PENDING', count: pendingEvaluations, percentage: (pendingEvaluations / totalEvaluations) * 100 },
-      { status: 'VALIDATED', count: validatedEvaluations, percentage: (validatedEvaluations / totalEvaluations) * 100 },
-      { status: 'REJECTED', count: rejectedEvaluations, percentage: (rejectedEvaluations / totalEvaluations) * 100 }
+      { status: 'COMPLETED', count: completedEvaluations, percentage: totalEvaluations > 0 ? (completedEvaluations / totalEvaluations) * 100 : 0 },
+      { status: 'PENDING', count: pendingEvaluations, percentage: totalEvaluations > 0 ? (pendingEvaluations / totalEvaluations) * 100 : 0 },
+      { status: 'VALIDATED', count: validatedEvaluations, percentage: totalEvaluations > 0 ? (validatedEvaluations / totalEvaluations) * 100 : 0 },
+      { status: 'REJECTED', count: rejectedEvaluations, percentage: totalEvaluations > 0 ? (rejectedEvaluations / totalEvaluations) * 100 : 0 }
     ]
 
     return {
@@ -177,9 +177,9 @@ class EvaluationStatsService {
     })
 
     return Object.entries(monthGroups).map(([month, evals]) => {
-      const completedEvals = evals.filter(e => e.status === 'COMPLETED' && e.overallScore)
-      const averageScore = completedEvals.length > 0
-        ? completedEvals.reduce((sum, e) => sum + (e.overallScore || 0), 0) / completedEvals.length
+      const evalsWithScores = evals.filter(e => e.averageScore !== undefined && e.averageScore !== null)
+      const averageScore = evalsWithScores.length > 0
+        ? evalsWithScores.reduce((sum, e) => sum + (e.averageScore || 0), 0) / evalsWithScores.length
         : 0
 
       return {
@@ -205,9 +205,9 @@ class EvaluationStatsService {
 
     return Object.entries(driverGroups)
       .map(([driverUuid, data]) => {
-        const completedEvals = data.evaluations.filter(e => e.status === 'COMPLETED' && e.overallScore)
-        const averageScore = completedEvals.length > 0
-          ? completedEvals.reduce((sum, e) => sum + (e.overallScore || 0), 0) / completedEvals.length
+        const evalsWithScores = data.evaluations.filter(e => e.averageScore !== undefined && e.averageScore !== null)
+        const averageScore = evalsWithScores.length > 0
+          ? evalsWithScores.reduce((sum, e) => sum + (e.averageScore || 0), 0) / evalsWithScores.length
           : 0
 
         return {
