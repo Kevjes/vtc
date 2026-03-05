@@ -16,7 +16,8 @@ import {
   CardTitle,
   Button,
   Input,
-  Select
+  Select,
+  PhoneInput
 } from '@/components/ui'
 import { PartnerPermissions } from '@/types'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -30,6 +31,8 @@ interface PartnerFormData {
   phone: string
   companyIdentifier: string
   address: string
+  country: string
+  countryCode: string
 }
 
 const statusOptions = [
@@ -53,7 +56,9 @@ export default function NewPartnerPage() {
     email: '',
     phone: '',
     companyIdentifier: '',
-    address: ''
+    address: '',
+    country: '',
+    countryCode: ''
   })
 
   const [errors, setErrors] = useState<Partial<Record<keyof PartnerFormData, string>>>({})
@@ -123,6 +128,20 @@ export default function NewPartnerPage() {
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }))
+    }
+  }
+
+  const handlePhoneChange = (phone: string, countryCode: string, country: string) => {
+    setFormData(prev => ({
+      ...prev,
+      phone,
+      countryCode,
+      country
+    }))
+
+    // Clear phone error
+    if (errors.phone) {
+      setErrors(prev => ({ ...prev, phone: undefined }))
     }
   }
 
@@ -231,14 +250,22 @@ export default function NewPartnerPage() {
                   error={errors.email}
                   placeholder="contact@expressvoyages.cm"
                 />
-                <Input
-                  label="Téléphone *"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  error={errors.phone}
-                  placeholder="+237699112233"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                    Téléphone *
+                  </label>
+                  <PhoneInput
+                    value={formData.phone}
+                    onChange={handlePhoneChange}
+                    placeholder="699112233"
+                    error={errors.phone}
+                  />
+                  {formData.country && (
+                    <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                      Pays détecté: {formData.country} ({formData.countryCode})
+                    </p>
+                  )}
+                </div>
               </div>
               <Input
                 label="Adresse *"
